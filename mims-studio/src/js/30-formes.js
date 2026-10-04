@@ -11,6 +11,7 @@ class GenModele {
     this.ressorts = new Set(); // "a,b" avec a < b
     this.sortiesIds = [];
     this.entree = null;        // {x, y, z, cible}
+    this.sol = false;          // plancher physique en z = 0
   }
   masse(x, y, z, grounded = false) {
     const id = this.masses.length;
@@ -24,6 +25,67 @@ class GenModele {
   frappe(id, hauteurAuDessus = 5.0) {
     const m = this.masses[id];
     this.entree = { x: m.x, y: m.y, z: m.z + hauteurAuDessus, cible: id };
+  }
+  /* Les deux "extremites" de l'objet : les points les plus eloignes en
+   * suivant la structure (diametre du graphe des ressorts, pondere par la
+   * longueur). Donut coupe -> ses deux bouts, spirale -> debut et fin,
+   * anneau ferme -> deux points opposes. Un couple par morceau. */
+  extremites() {
+    if (this.extremitesImposees) return this.extremitesImposees;
+    const n = this.masses.length, voisins = this.masses.map(() => []);
+    const dist = (a, b) => Math.hypot(this.masses[a].x - this.masses[b].x,
+      this.masses[a].y - this.masses[b].y, this.masses[a].z - this.masses[b].z);
+    for (const s of this.ressorts) {
+      const [a, b] = s.split(",").map(Number), d = dist(a, b);
+      voisins[a].push([b, d]); voisins[b].push([a, d]);
+    }
+    const plusLoin = depart => {                     // Dijkstra simple (n petit)
+      const d = new Float64Array(n).fill(Infinity), vu = new Uint8Array(n);
+      d[depart] = 0;
+      for (;;) {
+        let u = -1;
+        for (let i = 0; i < n; i++) if (!vu[i] && d[i] < Infinity && (u < 0 || d[i] < d[u])) u = i;
+        if (u < 0) break;
+        vu[u] = 1;
+        for (const [v, w] of voisins[u]) if (d[u] + w < d[v]) d[v] = d[u] + w;
+      }
+      let loin = depart;
+      for (let i = 0; i < n; i++) if (d[i] < Infinity && d[i] > d[loin]) loin = i;
+      return [loin, vu];
+    };
+    const paires = [], traite = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      if (traite[i]) continue;
+      // depart : le point le plus bas du morceau, puis deux balayages
+      const [, morceau] = plusLoin(i);
+      let bas = i;
+      for (let k = 0; k < n; k++) if (morceau[k]) { traite[k] = 1; if (this.masses[k].z < this.masses[bas].z) bas = k; }
+      const [a] = plusLoin(bas), [b] = plusLoin(a);
+      paires.push(a === b ? [a] : [a, b]);
+    }
+    return paires.flat();
+  }
+  /* accroche l'objet par ses extremites seulement (et le pose sur le sol) */
+  ancrerExtremites() {
+    for (const m of this.masses) m.grounded = false;
+    for (const id of this.extremites()) this.masses[id].grounded = true;
+    this.sol = true;
+    this._reviseCibles();
+  }
+  /* la bille et les ecoutes ne doivent pas viser un point fixe */
+  _reviseCibles() {
+    const mobileProche = id => {
+      let best = -1, dmin = Infinity;
+      const a = this.masses[id];
+      for (const m of this.masses) {
+        if (m.grounded) continue;
+        const d = Math.hypot(m.x - a.x, m.y - a.y, m.z - a.z);
+        if (d < dmin) { dmin = d; best = m.id; }
+      }
+      return best < 0 ? id : best;
+    };
+    if (this.entree && this.masses[this.entree.cible].grounded) this.frappe(this.sommetLePlusHaut());
+    this.sortiesIds = this.sortiesIds.map(id => this.masses[id].grounded ? mobileProche(id) : id);
   }
   sommetLePlusHaut() {
     let best = this.masses[0];
@@ -42,6 +104,7 @@ class GenModele {
     L.push(`@${n}_K param ${this.K}`);
     L.push(`@${n}_Z param ${this.Z}`);
     L.push(`@${n}_Zo param ${this.Zo}`);
+    if (this.sol) { L.push(`@${n}_solK param 1.0`); L.push(`@${n}_solZ param 0.005`); }
     L.push("");
     for (const m of this.masses) {
       if (m.grounded) L.push(`@${n}_m${m.id} ground 0.`);
@@ -61,10 +124,19 @@ class GenModele {
       L.push(`@${n}_exc contact @${n}_m${e.cible} @in1 0.1 0.001 ${f(cible.z - e.z)}`);
     }
     this.sortiesIds.forEach((id, i) => L.push(`@out${i + 1} posOutput @${n}_m${id}`));
+    if (this.sol) {
+      // plancher : un contact par masse mobile avec le sol (z = 0) ; le seuil
+      // vaut la hauteur de la masse, donc le choc a lieu quand elle touche le plan
+      L.push("", `# sol : aucune masse ne passe sous z = 0`, `@${n}_sol ground 0.`);
+      for (const m of this.masses)
+        if (!m.grounded)
+          L.push(`@${n}_s${m.id} contact @${n}_sol @${n}_m${m.id} ${n}_solK ${n}_solZ ${f(-m.z)}`);
+    }
     L.push("");
     L.push(`# geometrie 3D (affichage seulement) : ${this.masses.length} masses, ${this.ressorts.size} ressorts`);
     for (const m of this.masses) L.push(`~pos @${n}_m${m.id} ${f(m.x)} ${f(m.y)} ${f(m.z)}`);
     if (this.entree) L.push(`~pos @in1 ${f(this.entree.x)} ${f(this.entree.y)} ${f(this.entree.z)}`);
+    if (this.sol) L.push(`~pos @${n}_sol 0 0 0`);
     return L.join("\n") + "\n";
   }
 }
@@ -331,7 +403,8 @@ function formeColimacon(n = 90, tours = 3, R0 = 9.0, H = 13.0) {
   }
   for (let i = 0; i < n - 1; i++) m.ressort(ids[i], ids[i + 1]);
   for (let i = 0; i < n - parTour; i++) m.ressort(ids[i], ids[i + parTour]);
-  m.frappe(ids[n - 1]);
+  m.extremitesImposees = [ids[0], ids[n - 1]];       // debut et fin de la spirale
+  m.frappe(ids[n - 2]);
   m.ecoute(ids[Math.floor(n / 2)]);
   m.ecoute(ids[parTour]);
   return [m, "spirale logarithmique : auto-similarite -> cascade de resonances (chirp)"];
@@ -495,9 +568,16 @@ const CATALOGUE = {
           "Arbre binaire auto-similaire (quasi-octaves)", {}],
 };
 
+/* formes qui gardent leur accroche d'origine : la cloche pend par sa
+ * couronne, l'arbre tient par son pied ; les autres sont accrochees par
+ * leurs deux extremites et posees sur le sol */
+const ACCROCHE_PROPRE = ["cloche", "arbre"];
+
 function genere(nom, params) {
   const [fabrique] = CATALOGUE[nom];
   const [modele, note] = fabrique(params);
+  if (ACCROCHE_PROPRE.includes(nom)) { modele.sol = true; modele._reviseCibles(); }
+  else modele.ancrerExtremites();
   return [modele.script(note), note];
 }
 

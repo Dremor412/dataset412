@@ -33,6 +33,7 @@ class Vue3D {
     this.pos = new Float64Array(0);      // x y z par point (noeuds puis proxies)
     this.selection = -1;
     this.selection2 = -1;
+    this._plancher = new Set();
     this._drag = null;
     this._demandeDessin = false;
 
@@ -81,6 +82,7 @@ class Vue3D {
       desc.proxyGeo.forEach((g, k) => this.pos.set(g, 3 * (desc.nbNoeuds + k)));
       this._sorties = new Set(desc.sorties.map(s => s.i));
       this._entreesForce = new Set(desc.entrees.map(e => e.i));
+      this._plancher = new Set(desc.plancher || []);
     }
     if (!ancien || !desc || this.selection >= T || ancien.noms[this.selection] !== (desc.noms[this.selection]))
       this.selection = -1;
@@ -96,8 +98,10 @@ class Vue3D {
     for (let i = 0; i < d.nbNoeuds; i++) {
       if (i === tenue) continue;
       const e = d.etat[i];
-      this.pos[3 * i + 2] = d.gz[i] + (e === MOBILE ? (u[i] - d.u0[i]) * amp + d.u0[i]
-                                       : e === ENTREE && !(entraines && entraines.has(i)) ? u[i] : d.u0[i]);
+      let z = d.gz[i] + (e === MOBILE ? (u[i] - d.u0[i]) * amp + d.u0[i]
+                         : e === ENTREE && !(entraines && entraines.has(i)) ? u[i] : d.u0[i]);
+      if (d.gz[i] >= 0 && z < 0) z = 0;              // rien ne s'affiche sous le plan
+      this.pos[3 * i + 2] = z;
     }
     for (let k = 0; k < d.nbProxies; k++) {
       const p = d.proxies[k];
@@ -196,6 +200,7 @@ class Vue3D {
       ctx.strokeStyle = coul; ctx.setLineDash(tirets); ctx.lineWidth = cle === -1 ? 1 : 1.5;
       ctx.beginPath();
       for (const l of liste) {
+        if (this._plancher.has(l.i1) || this._plancher.has(l.i2)) continue;   // contacts au sol : invisibles
         ctx.moveTo(P[4 * l.i1], P[4 * l.i1 + 1]);
         ctx.lineTo(P[4 * l.i2], P[4 * l.i2 + 1]);
       }
@@ -209,6 +214,7 @@ class Vue3D {
     if (T < 4000) ordre.sort((a, b) => P[4 * b + 2] - P[4 * a + 2]);
     const petit = n > 600;
     for (const i of ordre) {
+      if (this._plancher.has(i)) continue;
       const px = P[4 * i], py = P[4 * i + 1], s = P[4 * i + 3];
       let r, coul, carre = false;
       if (i >= n) { r = 3.2 * s; coul = COULEURS.proxy; }
@@ -268,7 +274,7 @@ class Vue3D {
     const P = this._projetteTout();
     let best = -1, dmin = rayon;
     for (let i = 0; i < P.length / 4; i++) {
-      if (filtre && !filtre(i)) continue;
+      if ((filtre && !filtre(i)) || (this._plancher && this._plancher.has(i))) continue;
       const dd = Math.hypot(P[4 * i] - ex, P[4 * i + 1] - ey);
       if (dd < dmin) { best = i; dmin = dd; }
     }
@@ -306,7 +312,8 @@ class Vue3D {
     const [mode, x0, y0] = this._drag;
     if (mode === "bille") {
       const [, yDepart, zDepart, i, echelle] = this._drag;
-      const z = zDepart - (y - yDepart) / echelle;
+      let z = zDepart - (y - yDepart) / echelle;
+      if (this.desc.gz[i] >= 0) z = Math.max(z, 0);  // la bille ne traverse pas le plan
       this.pos[3 * i + 2] = z;
       if (this.rappels.surPlacement) this.rappels.surPlacement(i, z);
       this.redessiner();

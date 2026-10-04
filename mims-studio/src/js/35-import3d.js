@@ -182,7 +182,7 @@ function plafonnerRessorts(verts, aretes, plafond) {
  *            relier: bool, nom} */
 function adapter3D(brut, options) {
   const o = Object.assign({ masses: 300, ressorts: 0, orientation: "auto", taille: 16,
-                            fixation: "bas", relier: true, nom: "objet" }, options);
+                            fixation: "extremites", sol: true, relier: true, nom: "objet" }, options);
   let { verts, aretes, simplifie } = simplifier(brut.verts, brut.aretes, o.masses);
   aretes = aretes.map(e => e.slice());
   const liesAjoutes = o.relier ? relierMorceaux(verts, aretes) : 0;
@@ -202,7 +202,8 @@ function adapter3D(brut, options) {
   verts = verts.map(v => v.map(c => c * k));
 
   const zmax = Math.max(...verts.map(v => v[2]));
-  const fixe = verts.map(v => o.fixation === "bas" ? v[2] <= 0.04 * zmax + 1e-9
+  const fixe = verts.map(v => o.fixation === "extremites" ? false
+                             : o.fixation === "bas" ? v[2] <= 0.04 * zmax + 1e-9
                              : o.fixation === "haut" ? v[2] >= 0.96 * zmax - 1e-9 : false);
   if (o.fixation !== "aucun" && fixe.every(Boolean)) fixe.fill(false);
 
@@ -211,18 +212,24 @@ function adapter3D(brut, options) {
   const m = new GenModele(nom, 1.0, 0.1, 0.0001, 0.003);
   const ids = verts.map((v, i) => m.masse(v[0], v[1], v[2], fixe[i]));
   for (const [a, b] of aretes) m.ressort(ids[a], ids[b]);
-  const mobiles = ids.filter((_, i) => !fixe[i]);
+  if (o.fixation === "extremites") {
+    for (const id of m.extremites()) { m.masses[id].grounded = true; fixe[id] = true; }
+  }
+  m.sol = !!o.sol;
+  const mobiles = ids.filter(id => !m.masses[id].grounded);
   if (mobiles.length) {
     m.frappe(m.sommetLePlusHaut());
     m.ecoute(mobiles[Math.floor(mobiles.length / 3)]);
     m.ecoute(mobiles[Math.floor(2 * mobiles.length / 3)]);
   }
-  const nFixes = fixe.filter(Boolean).length;
+  const nFixes = m.masses.filter(mm => mm.grounded).length;
   let note = `importe de ${o.nom} : ${brut.verts.length} sommets / ${brut.aretes.length} aretes`;
   if (simplifie) note += ` -> ${verts.length} masses`;
   if (plaf.limite) note += `, ressorts plafonnes a ${aretes.length}`;
   if (liesAjoutes) note += `, ${liesAjoutes} morceau(x) relie(s)`;
   note += `, ${nFixes} point(s) fixe(s)`;
-  return { modele: m, note, masses: verts.length, ressorts: m.ressorts.size + (mobiles.length ? 1 : 0),
+  const nSol = m.sol ? m.masses.filter(mm => !mm.grounded).length : 0;
+  return { modele: m, note, masses: verts.length + (nSol ? 1 : 0),
+           ressorts: m.ressorts.size + (mobiles.length ? 1 : 0) + nSol,
            fixes: nFixes, liesAjoutes };
 }

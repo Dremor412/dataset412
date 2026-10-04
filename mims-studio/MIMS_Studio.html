@@ -306,7 +306,8 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
     <input type="number" id="imp-ressorts" min="0" max="20000" value="0"></div>
   <div class="champ"><span>points fixes</span>
     <select id="imp-fixation">
-      <option value="bas">la base (posé au sol)</option>
+      <option value="extremites">ses 2 extrémités</option>
+      <option value="bas">toute la base</option>
       <option value="haut">le sommet (suspendu)</option>
       <option value="aucun">aucun (objet libre)</option>
     </select></div>
@@ -316,7 +317,8 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
     </select></div>
   <div class="champ"><span>taille dans la scène</span>
     <input type="number" id="imp-taille" min="2" max="60" value="16"></div>
-  <label class="case"><input type="checkbox" id="imp-relier" checked> relier les morceaux séparés</label>
+  <label class="case"><input type="checkbox" id="imp-relier" checked> relier les morceaux séparés</label><br>
+  <label class="case"><input type="checkbox" id="imp-sol" checked> sol : l'objet ne passe jamais sous le plan</label>
   <div id="imp-apercu" class="apercu"></div>
   <div class="actions">
     <button class="btn" id="imp-go">Importer</button>
@@ -3050,6 +3052,8 @@ function compiler(mdl, options = {}) {
     liens: liens.map((l, k) => ({ code: l.code, i1: l.i1, i2: l.i2, args: l.args, dec: dec[k], nom: l.nom || null })),
     entrees, sorties,
     macros: [...macros].map(([nom, m]) => ({ nom, ...m })),
+    // plancher : point fixe nomme "sol" ou "..._sol" (contacts au plan z = 0)
+    plancher: N.noms.map((nom, i) => i).filter(i => N.etat[i] === FIXE && /(^|_)sol$/.test(N.noms[i])),
     indices: [...indice],
   };
 }
@@ -3594,6 +3598,7 @@ class GenModele {
     this.ressorts = new Set(); // "a,b" avec a < b
     this.sortiesIds = [];
     this.entree = null;        // {x, y, z, cible}
+    this.sol = false;          // plancher physique en z = 0
   }
   masse(x, y, z, grounded = false) {
     const id = this.masses.length;
@@ -3607,6 +3612,67 @@ class GenModele {
   frappe(id, hauteurAuDessus = 5.0) {
     const m = this.masses[id];
     this.entree = { x: m.x, y: m.y, z: m.z + hauteurAuDessus, cible: id };
+  }
+  /* Les deux "extremites" de l'objet : les points les plus eloignes en
+   * suivant la structure (diametre du graphe des ressorts, pondere par la
+   * longueur). Donut coupe -> ses deux bouts, spirale -> debut et fin,
+   * anneau ferme -> deux points opposes. Un couple par morceau. */
+  extremites() {
+    if (this.extremitesImposees) return this.extremitesImposees;
+    const n = this.masses.length, voisins = this.masses.map(() => []);
+    const dist = (a, b) => Math.hypot(this.masses[a].x - this.masses[b].x,
+      this.masses[a].y - this.masses[b].y, this.masses[a].z - this.masses[b].z);
+    for (const s of this.ressorts) {
+      const [a, b] = s.split(",").map(Number), d = dist(a, b);
+      voisins[a].push([b, d]); voisins[b].push([a, d]);
+    }
+    const plusLoin = depart => {                     // Dijkstra simple (n petit)
+      const d = new Float64Array(n).fill(Infinity), vu = new Uint8Array(n);
+      d[depart] = 0;
+      for (;;) {
+        let u = -1;
+        for (let i = 0; i < n; i++) if (!vu[i] && d[i] < Infinity && (u < 0 || d[i] < d[u])) u = i;
+        if (u < 0) break;
+        vu[u] = 1;
+        for (const [v, w] of voisins[u]) if (d[u] + w < d[v]) d[v] = d[u] + w;
+      }
+      let loin = depart;
+      for (let i = 0; i < n; i++) if (d[i] < Infinity && d[i] > d[loin]) loin = i;
+      return [loin, vu];
+    };
+    const paires = [], traite = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      if (traite[i]) continue;
+      // depart : le point le plus bas du morceau, puis deux balayages
+      const [, morceau] = plusLoin(i);
+      let bas = i;
+      for (let k = 0; k < n; k++) if (morceau[k]) { traite[k] = 1; if (this.masses[k].z < this.masses[bas].z) bas = k; }
+      const [a] = plusLoin(bas), [b] = plusLoin(a);
+      paires.push(a === b ? [a] : [a, b]);
+    }
+    return paires.flat();
+  }
+  /* accroche l'objet par ses extremites seulement (et le pose sur le sol) */
+  ancrerExtremites() {
+    for (const m of this.masses) m.grounded = false;
+    for (const id of this.extremites()) this.masses[id].grounded = true;
+    this.sol = true;
+    this._reviseCibles();
+  }
+  /* la bille et les ecoutes ne doivent pas viser un point fixe */
+  _reviseCibles() {
+    const mobileProche = id => {
+      let best = -1, dmin = Infinity;
+      const a = this.masses[id];
+      for (const m of this.masses) {
+        if (m.grounded) continue;
+        const d = Math.hypot(m.x - a.x, m.y - a.y, m.z - a.z);
+        if (d < dmin) { dmin = d; best = m.id; }
+      }
+      return best < 0 ? id : best;
+    };
+    if (this.entree && this.masses[this.entree.cible].grounded) this.frappe(this.sommetLePlusHaut());
+    this.sortiesIds = this.sortiesIds.map(id => this.masses[id].grounded ? mobileProche(id) : id);
   }
   sommetLePlusHaut() {
     let best = this.masses[0];
@@ -3625,6 +3691,7 @@ class GenModele {
     L.push(`@${n}_K param ${this.K}`);
     L.push(`@${n}_Z param ${this.Z}`);
     L.push(`@${n}_Zo param ${this.Zo}`);
+    if (this.sol) { L.push(`@${n}_solK param 1.0`); L.push(`@${n}_solZ param 0.005`); }
     L.push("");
     for (const m of this.masses) {
       if (m.grounded) L.push(`@${n}_m${m.id} ground 0.`);
@@ -3644,10 +3711,19 @@ class GenModele {
       L.push(`@${n}_exc contact @${n}_m${e.cible} @in1 0.1 0.001 ${f(cible.z - e.z)}`);
     }
     this.sortiesIds.forEach((id, i) => L.push(`@out${i + 1} posOutput @${n}_m${id}`));
+    if (this.sol) {
+      // plancher : un contact par masse mobile avec le sol (z = 0) ; le seuil
+      // vaut la hauteur de la masse, donc le choc a lieu quand elle touche le plan
+      L.push("", `# sol : aucune masse ne passe sous z = 0`, `@${n}_sol ground 0.`);
+      for (const m of this.masses)
+        if (!m.grounded)
+          L.push(`@${n}_s${m.id} contact @${n}_sol @${n}_m${m.id} ${n}_solK ${n}_solZ ${f(-m.z)}`);
+    }
     L.push("");
     L.push(`# geometrie 3D (affichage seulement) : ${this.masses.length} masses, ${this.ressorts.size} ressorts`);
     for (const m of this.masses) L.push(`~pos @${n}_m${m.id} ${f(m.x)} ${f(m.y)} ${f(m.z)}`);
     if (this.entree) L.push(`~pos @in1 ${f(this.entree.x)} ${f(this.entree.y)} ${f(this.entree.z)}`);
+    if (this.sol) L.push(`~pos @${n}_sol 0 0 0`);
     return L.join("\n") + "\n";
   }
 }
@@ -3914,7 +3990,8 @@ function formeColimacon(n = 90, tours = 3, R0 = 9.0, H = 13.0) {
   }
   for (let i = 0; i < n - 1; i++) m.ressort(ids[i], ids[i + 1]);
   for (let i = 0; i < n - parTour; i++) m.ressort(ids[i], ids[i + parTour]);
-  m.frappe(ids[n - 1]);
+  m.extremitesImposees = [ids[0], ids[n - 1]];       // debut et fin de la spirale
+  m.frappe(ids[n - 2]);
   m.ecoute(ids[Math.floor(n / 2)]);
   m.ecoute(ids[parTour]);
   return [m, "spirale logarithmique : auto-similarite -> cascade de resonances (chirp)"];
@@ -4078,9 +4155,16 @@ const CATALOGUE = {
           "Arbre binaire auto-similaire (quasi-octaves)", {}],
 };
 
+/* formes qui gardent leur accroche d'origine : la cloche pend par sa
+ * couronne, l'arbre tient par son pied ; les autres sont accrochees par
+ * leurs deux extremites et posees sur le sol */
+const ACCROCHE_PROPRE = ["cloche", "arbre"];
+
 function genere(nom, params) {
   const [fabrique] = CATALOGUE[nom];
   const [modele, note] = fabrique(params);
+  if (ACCROCHE_PROPRE.includes(nom)) { modele.sol = true; modele._reviseCibles(); }
+  else modele.ancrerExtremites();
   return [modele.script(note), note];
 }
 
@@ -4271,7 +4355,7 @@ function plafonnerRessorts(verts, aretes, plafond) {
  *            relier: bool, nom} */
 function adapter3D(brut, options) {
   const o = Object.assign({ masses: 300, ressorts: 0, orientation: "auto", taille: 16,
-                            fixation: "bas", relier: true, nom: "objet" }, options);
+                            fixation: "extremites", sol: true, relier: true, nom: "objet" }, options);
   let { verts, aretes, simplifie } = simplifier(brut.verts, brut.aretes, o.masses);
   aretes = aretes.map(e => e.slice());
   const liesAjoutes = o.relier ? relierMorceaux(verts, aretes) : 0;
@@ -4291,7 +4375,8 @@ function adapter3D(brut, options) {
   verts = verts.map(v => v.map(c => c * k));
 
   const zmax = Math.max(...verts.map(v => v[2]));
-  const fixe = verts.map(v => o.fixation === "bas" ? v[2] <= 0.04 * zmax + 1e-9
+  const fixe = verts.map(v => o.fixation === "extremites" ? false
+                             : o.fixation === "bas" ? v[2] <= 0.04 * zmax + 1e-9
                              : o.fixation === "haut" ? v[2] >= 0.96 * zmax - 1e-9 : false);
   if (o.fixation !== "aucun" && fixe.every(Boolean)) fixe.fill(false);
 
@@ -4300,19 +4385,25 @@ function adapter3D(brut, options) {
   const m = new GenModele(nom, 1.0, 0.1, 0.0001, 0.003);
   const ids = verts.map((v, i) => m.masse(v[0], v[1], v[2], fixe[i]));
   for (const [a, b] of aretes) m.ressort(ids[a], ids[b]);
-  const mobiles = ids.filter((_, i) => !fixe[i]);
+  if (o.fixation === "extremites") {
+    for (const id of m.extremites()) { m.masses[id].grounded = true; fixe[id] = true; }
+  }
+  m.sol = !!o.sol;
+  const mobiles = ids.filter(id => !m.masses[id].grounded);
   if (mobiles.length) {
     m.frappe(m.sommetLePlusHaut());
     m.ecoute(mobiles[Math.floor(mobiles.length / 3)]);
     m.ecoute(mobiles[Math.floor(2 * mobiles.length / 3)]);
   }
-  const nFixes = fixe.filter(Boolean).length;
+  const nFixes = m.masses.filter(mm => mm.grounded).length;
   let note = `importe de ${o.nom} : ${brut.verts.length} sommets / ${brut.aretes.length} aretes`;
   if (simplifie) note += ` -> ${verts.length} masses`;
   if (plaf.limite) note += `, ressorts plafonnes a ${aretes.length}`;
   if (liesAjoutes) note += `, ${liesAjoutes} morceau(x) relie(s)`;
   note += `, ${nFixes} point(s) fixe(s)`;
-  return { modele: m, note, masses: verts.length, ressorts: m.ressorts.size + (mobiles.length ? 1 : 0),
+  const nSol = m.sol ? m.masses.filter(mm => !mm.grounded).length : 0;
+  return { modele: m, note, masses: verts.length + (nSol ? 1 : 0),
+           ressorts: m.ressorts.size + (mobiles.length ? 1 : 0) + nSol,
            fixes: nFixes, liesAjoutes };
 }
 
@@ -4344,8 +4435,8 @@ const MODELES_PRETS = [
 @out1 posOutput [@corde ecoute_pos]
 @out2 posOutput [@corde 0.5]
 
-~place @corde -12 0 0 12 0 0
-~pos @in1 -5.52 0 0
+~place @corde -12 0 4 12 0 4
+~pos @in1 -5.52 0 4
 `,
   },
   {
@@ -4365,8 +4456,8 @@ const MODELES_PRETS = [
 @out1 posOutput [@corde 0.96]
 @out2 posOutput [@corde 0.98]
 
-~place @corde -14 0 0 14 0 0
-~pos @in1 -10.36 0 0
+~place @corde -14 0 4 14 0 4
+~pos @in1 -10.36 0 4
 `,
   },
   {
@@ -4385,8 +4476,8 @@ const MODELES_PRETS = [
 @in1 frcInput @marteau
 @out1 posOutput [@corde ecoute_pos]
 
-~place @corde -12 0 0 12 0 0
-~pos @marteau -8.4 0 1.5
+~place @corde -12 0 4 12 0 4
+~pos @marteau -8.4 0 5.5
 `,
   },
   {
@@ -4407,8 +4498,8 @@ const MODELES_PRETS = [
 @out1 posOutput [@peau ecoute_x ecoute_y]
 @out2 posOutput [@peau 0.5 0.5]
 
-~place @peau -8 -8 0 8 8 0
-~pos @in1 -1.6 -2.4 3
+~place @peau -8 -8 4 8 8 4
+~pos @in1 -1.6 -2.4 7
 `,
   },
   {
@@ -4430,9 +4521,9 @@ const MODELES_PRETS = [
 @out1 posOutput [@table 0.3 0.7]
 @out2 posOutput [@corde 0.5]
 
-~place @corde -10 0 4 10 0 4
-~place @table -7 -5 0 7 5 0
-~pos @in1 -4 0 4
+~place @corde -10 0 8 10 0 8
+~place @table -7 -5 4 7 5 4
+~pos @in1 -4 0 8
 `,
   },
   {
@@ -4452,9 +4543,9 @@ const MODELES_PRETS = [
 @out1 posOutput @o1
 @out2 posOutput @o3
 
-~pos @o1 -4 0 2
-~pos @o2 0 0 2
-~pos @o3 4 0 2
+~pos @o1 -4 0 4
+~pos @o2 0 0 4
+~pos @o3 4 0 4
 `,
   },
 ];
@@ -4495,7 +4586,7 @@ const BRIQUES = {
       const p = [`@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`];
       let def = `@${nom} ${v.genre} ${v.n | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
       if (v.genre === "stiffString") { p.push(`@${nom}_K2 param ${v.K2}`); def = `@${nom} stiffString ${v.n | 0} ${v.M} ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`; }
-      return { params: p, corps: [def], geo: [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 0 ${f2(L / 2)} ${f2(y)} 0`] };
+      return { params: p, corps: [def], geo: [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 4 ${f2(L / 2)} ${f2(y)} 4`] };
     },
   },
   membrane: {
@@ -4509,7 +4600,7 @@ const BRIQUES = {
       return {
         params: [`@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`],
         corps: [`@${nom} ${v.genre} ${v.nx | 0} ${v.ny | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`],
-        geo: [`~place @${nom} ${f2(-lx / 2)} ${f2(y - ly)} 0 ${f2(lx / 2)} ${f2(y)} 0`],
+        geo: [`~place @${nom} ${f2(-lx / 2)} ${f2(y - ly)} 4 ${f2(lx / 2)} ${f2(y)} 4`],
       };
     },
   },
@@ -4518,7 +4609,7 @@ const BRIQUES = {
     champs: { M: ["masse", 1, 0.01, 100], K: ["raideur K", 0.01, 0, 1], Z: ["amortissement Z", 0.00002, 0, 0.1] },
     lignes(mdl, v, vue) {
       const nom = nomLibre(mdl, "osc"), y = rangeeLibre(vue);
-      return { params: [], corps: [`@${nom} osc ${v.M} ${v.K} ${v.Z} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 2`] };
+      return { params: [], corps: [`@${nom} osc ${v.M} ${v.K} ${v.Z} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 4`] };
     },
   },
   masse: {
@@ -4526,14 +4617,14 @@ const BRIQUES = {
     champs: { M: ["masse", 1, 0.01, 100] },
     lignes(mdl, v, vue) {
       const nom = nomLibre(mdl, "m"), y = rangeeLibre(vue);
-      return { params: [], corps: [`@${nom} mass ${v.M} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 2`] };
+      return { params: [], corps: [`@${nom} mass ${v.M} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 4`] };
     },
   },
   fixe: {
     titre: "Point fixe", desc: "Point immobile (ground), pour accrocher des ressorts.",
     champs: {},
     lignes(mdl, v, vue) {
-      const nom = nomLibre(mdl, "sol"), y = rangeeLibre(vue);
+      const nom = nomLibre(mdl, "fixe"), y = rangeeLibre(vue);
       return { params: [], corps: [`@${nom} ground 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 0`] };
     },
   },
@@ -4679,6 +4770,7 @@ class Vue3D {
     this.pos = new Float64Array(0);      // x y z par point (noeuds puis proxies)
     this.selection = -1;
     this.selection2 = -1;
+    this._plancher = new Set();
     this._drag = null;
     this._demandeDessin = false;
 
@@ -4727,6 +4819,7 @@ class Vue3D {
       desc.proxyGeo.forEach((g, k) => this.pos.set(g, 3 * (desc.nbNoeuds + k)));
       this._sorties = new Set(desc.sorties.map(s => s.i));
       this._entreesForce = new Set(desc.entrees.map(e => e.i));
+      this._plancher = new Set(desc.plancher || []);
     }
     if (!ancien || !desc || this.selection >= T || ancien.noms[this.selection] !== (desc.noms[this.selection]))
       this.selection = -1;
@@ -4742,8 +4835,10 @@ class Vue3D {
     for (let i = 0; i < d.nbNoeuds; i++) {
       if (i === tenue) continue;
       const e = d.etat[i];
-      this.pos[3 * i + 2] = d.gz[i] + (e === MOBILE ? (u[i] - d.u0[i]) * amp + d.u0[i]
-                                       : e === ENTREE && !(entraines && entraines.has(i)) ? u[i] : d.u0[i]);
+      let z = d.gz[i] + (e === MOBILE ? (u[i] - d.u0[i]) * amp + d.u0[i]
+                         : e === ENTREE && !(entraines && entraines.has(i)) ? u[i] : d.u0[i]);
+      if (d.gz[i] >= 0 && z < 0) z = 0;              // rien ne s'affiche sous le plan
+      this.pos[3 * i + 2] = z;
     }
     for (let k = 0; k < d.nbProxies; k++) {
       const p = d.proxies[k];
@@ -4842,6 +4937,7 @@ class Vue3D {
       ctx.strokeStyle = coul; ctx.setLineDash(tirets); ctx.lineWidth = cle === -1 ? 1 : 1.5;
       ctx.beginPath();
       for (const l of liste) {
+        if (this._plancher.has(l.i1) || this._plancher.has(l.i2)) continue;   // contacts au sol : invisibles
         ctx.moveTo(P[4 * l.i1], P[4 * l.i1 + 1]);
         ctx.lineTo(P[4 * l.i2], P[4 * l.i2 + 1]);
       }
@@ -4855,6 +4951,7 @@ class Vue3D {
     if (T < 4000) ordre.sort((a, b) => P[4 * b + 2] - P[4 * a + 2]);
     const petit = n > 600;
     for (const i of ordre) {
+      if (this._plancher.has(i)) continue;
       const px = P[4 * i], py = P[4 * i + 1], s = P[4 * i + 3];
       let r, coul, carre = false;
       if (i >= n) { r = 3.2 * s; coul = COULEURS.proxy; }
@@ -4914,7 +5011,7 @@ class Vue3D {
     const P = this._projetteTout();
     let best = -1, dmin = rayon;
     for (let i = 0; i < P.length / 4; i++) {
-      if (filtre && !filtre(i)) continue;
+      if ((filtre && !filtre(i)) || (this._plancher && this._plancher.has(i))) continue;
       const dd = Math.hypot(P[4 * i] - ex, P[4 * i + 1] - ey);
       if (dd < dmin) { best = i; dmin = dd; }
     }
@@ -4952,7 +5049,8 @@ class Vue3D {
     const [mode, x0, y0] = this._drag;
     if (mode === "bille") {
       const [, yDepart, zDepart, i, echelle] = this._drag;
-      const z = zDepart - (y - yDepart) / echelle;
+      let z = zDepart - (y - yDepart) / echelle;
+      if (this.desc.gz[i] >= 0) z = Math.max(z, 0);  // la bille ne traverse pas le plan
       this.pos[3 * i + 2] = z;
       if (this.rappels.surPlacement) this.rappels.surPlacement(i, z);
       this.redessiner();
@@ -5641,7 +5739,7 @@ const app = {
       const donnees = fichier.name.toLowerCase().endsWith(".stl") ? await fichier.arrayBuffer() : await fichier.text();
       brut = lire3D(fichier.name, donnees);
     } catch (e) { alert("Import impossible : " + e.message); return; }
-    const ratio = 3;                                  // ~3 ressorts par masse apres simplification
+    const ratio = 4;                                  // ~3 ressorts par masse + 1 contact au sol
     const maxBudget = budget.maxMasses(ratio);
     const max = Math.max(20, Math.min(brut.verts.length, Math.max(maxBudget * 2, 200), 5000));
     $("imp-nom").textContent = `Importer : ${fichier.name}`;
@@ -5670,7 +5768,7 @@ const app = {
     const plusTard = () => { clearTimeout(minuterie); minuterie = setTimeout(apercu, 120); };
     sld.oninput = () => { nb.value = sld.value; plusTard(); };
     nb.onchange = () => { sld.value = nb.value; plusTard(); };
-    for (const id of ["imp-ressorts", "imp-fixation", "imp-orientation", "imp-taille", "imp-relier"]) $(id).onchange = plusTard;
+    for (const id of ["imp-ressorts", "imp-fixation", "imp-orientation", "imp-taille", "imp-relier", "imp-sol"]) $(id).onchange = plusTard;
     $("imp-go").onclick = () => {
       if (!dernier) return;
       $("dlg-import").close();
@@ -5686,7 +5784,7 @@ const app = {
     return {
       masses: +$("imp-masses-n").value, ressorts: +$("imp-ressorts").value,
       fixation: $("imp-fixation").value, orientation: $("imp-orientation").value,
-      taille: +$("imp-taille").value, relier: $("imp-relier").checked, nom,
+      taille: +$("imp-taille").value, relier: $("imp-relier").checked, sol: $("imp-sol").checked, nom,
     };
   },
 

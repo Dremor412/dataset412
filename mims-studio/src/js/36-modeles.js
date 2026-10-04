@@ -24,8 +24,8 @@ const MODELES_PRETS = [
 @out1 posOutput [@corde ecoute_pos]
 @out2 posOutput [@corde 0.5]
 
-~place @corde -12 0 0 12 0 0
-~pos @in1 -5.52 0 0
+~place @corde -12 0 4 12 0 4
+~pos @in1 -5.52 0 4
 `,
   },
   {
@@ -45,8 +45,8 @@ const MODELES_PRETS = [
 @out1 posOutput [@corde 0.96]
 @out2 posOutput [@corde 0.98]
 
-~place @corde -14 0 0 14 0 0
-~pos @in1 -10.36 0 0
+~place @corde -14 0 4 14 0 4
+~pos @in1 -10.36 0 4
 `,
   },
   {
@@ -65,8 +65,8 @@ const MODELES_PRETS = [
 @in1 frcInput @marteau
 @out1 posOutput [@corde ecoute_pos]
 
-~place @corde -12 0 0 12 0 0
-~pos @marteau -8.4 0 1.5
+~place @corde -12 0 4 12 0 4
+~pos @marteau -8.4 0 5.5
 `,
   },
   {
@@ -87,8 +87,8 @@ const MODELES_PRETS = [
 @out1 posOutput [@peau ecoute_x ecoute_y]
 @out2 posOutput [@peau 0.5 0.5]
 
-~place @peau -8 -8 0 8 8 0
-~pos @in1 -1.6 -2.4 3
+~place @peau -8 -8 4 8 8 4
+~pos @in1 -1.6 -2.4 7
 `,
   },
   {
@@ -110,9 +110,9 @@ const MODELES_PRETS = [
 @out1 posOutput [@table 0.3 0.7]
 @out2 posOutput [@corde 0.5]
 
-~place @corde -10 0 4 10 0 4
-~place @table -7 -5 0 7 5 0
-~pos @in1 -4 0 4
+~place @corde -10 0 8 10 0 8
+~place @table -7 -5 4 7 5 4
+~pos @in1 -4 0 8
 `,
   },
   {
@@ -132,9 +132,9 @@ const MODELES_PRETS = [
 @out1 posOutput @o1
 @out2 posOutput @o3
 
-~pos @o1 -4 0 2
-~pos @o2 0 0 2
-~pos @o3 4 0 2
+~pos @o1 -4 0 4
+~pos @o2 0 0 4
+~pos @o3 4 0 4
 `,
   },
 ];
@@ -175,7 +175,7 @@ const BRIQUES = {
       const p = [`@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`];
       let def = `@${nom} ${v.genre} ${v.n | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
       if (v.genre === "stiffString") { p.push(`@${nom}_K2 param ${v.K2}`); def = `@${nom} stiffString ${v.n | 0} ${v.M} ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`; }
-      return { params: p, corps: [def], geo: [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 0 ${f2(L / 2)} ${f2(y)} 0`] };
+      return { params: p, corps: [def], geo: [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 4 ${f2(L / 2)} ${f2(y)} 4`] };
     },
   },
   membrane: {
@@ -189,7 +189,7 @@ const BRIQUES = {
       return {
         params: [`@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`],
         corps: [`@${nom} ${v.genre} ${v.nx | 0} ${v.ny | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`],
-        geo: [`~place @${nom} ${f2(-lx / 2)} ${f2(y - ly)} 0 ${f2(lx / 2)} ${f2(y)} 0`],
+        geo: [`~place @${nom} ${f2(-lx / 2)} ${f2(y - ly)} 4 ${f2(lx / 2)} ${f2(y)} 4`],
       };
     },
   },
@@ -198,7 +198,7 @@ const BRIQUES = {
     champs: { M: ["masse", 1, 0.01, 100], K: ["raideur K", 0.01, 0, 1], Z: ["amortissement Z", 0.00002, 0, 0.1] },
     lignes(mdl, v, vue) {
       const nom = nomLibre(mdl, "osc"), y = rangeeLibre(vue);
-      return { params: [], corps: [`@${nom} osc ${v.M} ${v.K} ${v.Z} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 2`] };
+      return { params: [], corps: [`@${nom} osc ${v.M} ${v.K} ${v.Z} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 4`] };
     },
   },
   masse: {
@@ -206,14 +206,14 @@ const BRIQUES = {
     champs: { M: ["masse", 1, 0.01, 100] },
     lignes(mdl, v, vue) {
       const nom = nomLibre(mdl, "m"), y = rangeeLibre(vue);
-      return { params: [], corps: [`@${nom} mass ${v.M} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 2`] };
+      return { params: [], corps: [`@${nom} mass ${v.M} 0. 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 4`] };
     },
   },
   fixe: {
     titre: "Point fixe", desc: "Point immobile (ground), pour accrocher des ressorts.",
     champs: {},
     lignes(mdl, v, vue) {
-      const nom = nomLibre(mdl, "sol"), y = rangeeLibre(vue);
+      const nom = nomLibre(mdl, "fixe"), y = rangeeLibre(vue);
       return { params: [], corps: [`@${nom} ground 0.`], geo: [`~pos @${nom} 0 ${f2(y)} 0`] };
     },
   },

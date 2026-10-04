@@ -68,6 +68,18 @@ déplacement, et on le dessine à la hauteur `~pos + déplacement`. Pour qu'une
 bille posée 3 unités au-dessus d'un objet le touche en descendant, son contact
 a un seuil de `-3`. Les générateurs le calculent tout seuls.
 
+**Accroche et sol.** Les formes 3D et les objets importés sont accrochés par
+leurs **deux extrémités** : les deux points les plus éloignés en suivant la
+structure (les deux bouts du donut coupé, le début et la fin de la spirale,
+deux points opposés d'un anneau). La cloche pend par sa couronne et l'arbre
+tient par son pied. Ils sont aussi posés sur un **sol** : un point fixe
+`@..._sol ground 0.` et un contact par masse, avec pour seuil la hauteur de la
+masse. Aucune masse ne passe ainsi sous le plan z = 0, ni à la frappe ni sous
+la bille. Ce sont de vrais éléments mi-gen, donc le comportement est le même
+dans Max. Les contacts avec le sol ne sont pas dessinés, et la vue n'affiche
+rien sous le plan, même avec l'amplification. Raideur et amortissement du
+sol : `@..._solK` et `@..._solZ`.
+
 L'ancien format du studio, avec les positions `[x y z]` dans la ligne de
 masse, est encore lu. À l'export vers Max, il est converti et les seuils de
 contact sont recalculés.

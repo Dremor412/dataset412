@@ -165,7 +165,8 @@
     <input type="number" id="imp-ressorts" min="0" max="20000" value="0"></div>
   <div class="champ"><span>points fixes</span>
     <select id="imp-fixation">
-      <option value="bas">la base (posé au sol)</option>
+      <option value="extremites">ses 2 extrémités</option>
+      <option value="bas">toute la base</option>
       <option value="haut">le sommet (suspendu)</option>
       <option value="aucun">aucun (objet libre)</option>
     </select></div>
@@ -175,7 +176,8 @@
     </select></div>
   <div class="champ"><span>taille dans la scène</span>
     <input type="number" id="imp-taille" min="2" max="60" value="16"></div>
-  <label class="case"><input type="checkbox" id="imp-relier" checked> relier les morceaux séparés</label>
+  <label class="case"><input type="checkbox" id="imp-relier" checked> relier les morceaux séparés</label><br>
+  <label class="case"><input type="checkbox" id="imp-sol" checked> sol : l'objet ne passe jamais sous le plan</label>
   <div id="imp-apercu" class="apercu"></div>
   <div class="actions">
     <button class="btn" id="imp-go">Importer</button>

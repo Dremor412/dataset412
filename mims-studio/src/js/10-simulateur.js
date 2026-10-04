@@ -203,6 +203,8 @@ function compiler(mdl, options = {}) {
     liens: liens.map((l, k) => ({ code: l.code, i1: l.i1, i2: l.i2, args: l.args, dec: dec[k], nom: l.nom || null })),
     entrees, sorties,
     macros: [...macros].map(([nom, m]) => ({ nom, ...m })),
+    // plancher : point fixe nomme "sol" ou "..._sol" (contacts au plan z = 0)
+    plancher: N.noms.map((nom, i) => i).filter(i => N.etat[i] === FIXE && /(^|_)sol$/.test(N.noms[i])),
     indices: [...indice],
   };
 }

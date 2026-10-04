@@ -519,7 +519,7 @@ const app = {
       const donnees = fichier.name.toLowerCase().endsWith(".stl") ? await fichier.arrayBuffer() : await fichier.text();
       brut = lire3D(fichier.name, donnees);
     } catch (e) { alert("Import impossible : " + e.message); return; }
-    const ratio = 3;                                  // ~3 ressorts par masse apres simplification
+    const ratio = 4;                                  // ~3 ressorts par masse + 1 contact au sol
     const maxBudget = budget.maxMasses(ratio);
     const max = Math.max(20, Math.min(brut.verts.length, Math.max(maxBudget * 2, 200), 5000));
     $("imp-nom").textContent = `Importer : ${fichier.name}`;
@@ -548,7 +548,7 @@ const app = {
     const plusTard = () => { clearTimeout(minuterie); minuterie = setTimeout(apercu, 120); };
     sld.oninput = () => { nb.value = sld.value; plusTard(); };
     nb.onchange = () => { sld.value = nb.value; plusTard(); };
-    for (const id of ["imp-ressorts", "imp-fixation", "imp-orientation", "imp-taille", "imp-relier"]) $(id).onchange = plusTard;
+    for (const id of ["imp-ressorts", "imp-fixation", "imp-orientation", "imp-taille", "imp-relier", "imp-sol"]) $(id).onchange = plusTard;
     $("imp-go").onclick = () => {
       if (!dernier) return;
       $("dlg-import").close();
@@ -564,7 +564,7 @@ const app = {
     return {
       masses: +$("imp-masses-n").value, ressorts: +$("imp-ressorts").value,
       fixation: $("imp-fixation").value, orientation: $("imp-orientation").value,
-      taille: +$("imp-taille").value, relier: $("imp-relier").checked, nom,
+      taille: +$("imp-taille").value, relier: $("imp-relier").checked, sol: $("imp-sol").checked, nom,
     };
   },
 
