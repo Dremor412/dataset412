@@ -46,6 +46,8 @@
   button.btn { background: #2c3442; color: var(--texte); border: 1px solid #3a4454;
                border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
   button.btn:hover { background: #38445a; }
+  button.btn.actif { background: #2e6b4a; border-color: #3f8f63; }
+  .grise { opacity: 0.4; }
   label.case { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
   input[type="range"] { width: 130px; }
 
@@ -133,10 +135,15 @@
       <button class="btn" id="btn-sim">⏵ Simuler</button>
       <button class="btn" id="btn-frapper">⚡ Frapper</button>
       <button class="btn" id="btn-reset">⟲ Reset</button>
-      <span>vitesse</span>
+      <button class="btn" id="btn-son" title="Son temps reel : un pas de calcul par echantillon audio">🔈 Son</button>
+      <span>force</span>
+      <input type="range" id="sld-force" min="0.01" max="1" step="0.01" value="0.3">
+      <span>volume</span>
+      <input type="range" id="sld-volume" min="-20" max="40" step="1" value="12">
+      <span id="lbl-vitesse">vitesse</span>
       <input type="range" id="sld-vitesse" min="30" max="1200" value="300">
       <span>amplification</span>
-      <input type="range" id="sld-ampli" min="1" max="12" step="0.1" value="3">
+      <input type="range" id="sld-ampli" min="1" max="40" step="0.1" value="3">
     </div>
     <div id="statut">pret</div>
   </div>
@@ -175,9 +182,19 @@
 
 SIMULATION
   Simuler : lance la physique (les billes bougent en hauteur)
-  Frapper : impulsion sur la bille selectionnee (ou la plus haute)
-  vitesse : nombre de pas de calcul par image
+  Frapper (ou barre espace) : impulsion sur la bille selectionnee
+            (ou la plus haute) ; curseur force = intensite
+  bille jaune (posInput) : l'attraper et la glisser verticalement
+            pour appuyer, pincer ou frotter l'objet
+  vitesse : nombre de pas de calcul par image (sans le son)
   amplification : exagere visuellement le mouvement
+
+SON
+  Son : ecoute en temps reel (1 pas de calcul = 1 echantillon,
+        comme gen~). Les posOutput sortent a gauche / droite ;
+        sans posOutput on ecoute deux masses de l'objet.
+  volume : gain avant le limiteur doux (en dB)
+  Le son est souvent trop rapide pour l'oeil : monte l'amplification.
 
 COULEURS
   bleu = masse mobile   rouge = point fixe (ground)
@@ -411,66 +428,121 @@ function parse(texte) {
  * ------------------------------------------------------------------ */
 
 class Simulateur {
-  constructor(modele) {
-    this.noms = [...modele.masses.keys()];
-    const idx = new Map(this.noms.map((n, i) => [n, i]));
+  /* Etat : x = hauteur actuelle, xr = hauteur au pas precedent, f = forces.
+   *
+   * Points de fixation : dans mi-gen les ressorts n'ont pas de longueur au
+   * repos (f = K * (x1 - x2)), car l'etat d'une masse y est un deplacement
+   * autour de 0. Ici la hauteur z sert AUSSI a dessiner la forme : appliquer
+   * la formule telle quelle tire toutes les masses vers la hauteur des
+   * points fixes et l'objet s'effondre. On integre donc les liaisons de
+   * structure (ressorts, amortisseurs, non-lineaires) sur l'ecart a la
+   * position de repos, et les osc autour de leur propre z de repos : c'est
+   * exactement la physique mi-gen, ou z_repos joue le role du 0.
+   * Les interactions "outil" (contact, nlContact, nlPluck, nlBow) restent en
+   * hauteurs absolues : c'est une vraie collision entre deux objets. */
+
+  static FIXES = ["ground", "posInput"];
+  static STRUCTURE = ["spring", "damper", "springDamper",
+                      "nlSpring2", "nlSpring3", "nlSpringDamper"];
+  static CODES = ["spring", "damper", "springDamper", "contact", "nlContact",
+                  "nlSpringDamper", "nlSpring3", "nlSpring2", "nlPluck", "nlBow"];
+  static NB_ARGS = 5;
+
+  /* Modele analyse (Maps) -> description simple, clonable vers un worklet. */
+  static compiler(modele) {
+    const noms = [...modele.masses.keys()];
+    const idx = new Map(noms.map((n, i) => [n, i]));
+    const masses = noms.map(n => {
+      const m = modele.masses.get(n);
+      return { genre: m.genre, z: m.z, vel: m.vel, args: [...m.args] };
+    });
+    const interactions = [];
+    for (const it of modele.interactions) {
+      if (!idx.has(it.m1) || !idx.has(it.m2)) continue;
+      if (!Simulateur.CODES.includes(it.genre)) continue;
+      interactions.push({ genre: it.genre, i1: idx.get(it.m1), i2: idx.get(it.m2),
+                          args: [...it.args] });
+    }
+    const sorties = modele.sorties
+      .filter(s => idx.has(s.cible))
+      .map(s => ({ genre: s.genre, i: idx.get(s.cible) }));
+    return { noms, masses, interactions, sorties };
+  }
+
+  constructor(desc) {
+    if (desc.masses instanceof Map) desc = Simulateur.compiler(desc);
+    this.noms = desc.noms;
+    this.sorties = desc.sorties || [];
     const n = this.noms.length;
 
     this.x = new Float64Array(n);
     this.xr = new Float64Array(n);
     this.f = new Float64Array(n);
-    this.xn = new Float64Array(n);
     this.mobile = new Uint8Array(n);
     this.A = new Float64Array(n).fill(2.0);
     this.B = new Float64Array(n).fill(-1.0);
     this.invM = new Float64Array(n).fill(1.0);
     this.grav = new Float64Array(n);
     this.z_init = new Float64Array(n);
+    this.v_init = new Float64Array(n);
+    this.cible = new Float64Array(n);       // hauteur visee des posInput
+    this.lissage = 0.002;                   // glissement vers la cible / pas
 
-    this.noms.forEach((nom, i) => {
-      const m = modele.masses.get(nom);
+    desc.masses.forEach((m, i) => {
       this.z_init[i] = m.z;
-      this.x[i] = m.z;
-      this.xr[i] = m.z - m.vel;          // vitesse initiale
-      if (estFixe(m)) return;
+      this.v_init[i] = m.vel;
+      if (Simulateur.FIXES.includes(m.genre)) return;
       this.mobile[i] = 1;
       if (m.genre === "mass") {
         const M = m.args.length ? m.args[0] : 1.0;
-        const g = m.args.length > 1 ? m.args[1] : 0.0;
         this.invM[i] = 1.0 / Math.max(M, 1e-9);
-        this.grav[i] = g;
+        this.grav[i] = m.args.length > 1 ? m.args[1] : 0.0;
       } else if (m.genre === "osc") {
-        const [M, K, Z] = m.args;
-        const g = m.args.length > 3 ? m.args[3] : 0.0;
+        const [M, K = 0, Z = 0] = m.args;
         const invM = 1.0 / Math.max(M, 1e-9);
         this.invM[i] = invM;
         this.A[i] = 2.0 - (K + Z) * invM;
         this.B[i] = Z * invM - 1.0;
-        this.grav[i] = g;
+        this.grav[i] = m.args.length > 3 ? m.args[3] : 0.0;
       }
     });
 
-    // interactions groupees par genre
-    this.lots = new Map();               // genre -> {i1, i2, args[][]}
-    for (const it of modele.interactions) {
-      if (!idx.has(it.m1) || !idx.has(it.m2)) continue;
-      if (!this.lots.has(it.genre)) this.lots.set(it.genre, { i1: [], i2: [], args: [] });
-      const lot = this.lots.get(it.genre);
-      lot.i1.push(idx.get(it.m1));
-      lot.i2.push(idx.get(it.m2));
-      lot.args.push(it.args);
-    }
+    // interactions a plat (tableaux types) : boucle de calcul rapide
+    const ni = desc.interactions.length, NA = Simulateur.NB_ARGS;
+    this.code = new Int8Array(ni);
+    this.i1 = new Int32Array(ni);
+    this.i2 = new Int32Array(ni);
+    this.d0 = new Float64Array(ni);          // ecart au repos (structure)
+    this.args = new Float64Array(ni * NA);
+    this.nargs = new Int8Array(ni);
+    desc.interactions.forEach((it, k) => {
+      this.code[k] = Simulateur.CODES.indexOf(it.genre);
+      this.i1[k] = it.i1;
+      this.i2[k] = it.i2;
+      if (Simulateur.STRUCTURE.includes(it.genre))
+        this.d0[k] = this.z_init[it.i1] - this.z_init[it.i2];
+      this.nargs[k] = Math.min(it.args.length, NA);
+      for (let j = 0; j < this.nargs[k]; j++) this.args[k * NA + j] = it.args[j];
+    });
+    this.reset();
   }
 
   reset() {
     this.x.set(this.z_init);
-    this.xr.set(this.z_init);
+    this.cible.set(this.z_init);
+    for (let i = 0; i < this.x.length; i++)
+      this.xr[i] = this.z_init[i] - this.v_init[i];      // vitesse initiale
     this.f.fill(0.0);
   }
 
-  frapper(nomOuIndice, force = 1.2) {
-    const i = typeof nomOuIndice === "string"
-      ? this.noms.indexOf(nomOuIndice) : nomOuIndice;
+  indice(nomOuIndice) {
+    return typeof nomOuIndice === "string" ? this.noms.indexOf(nomOuIndice) : nomOuIndice;
+  }
+
+  /* Impulsion de vitesse vers le bas (unites par pas de calcul). */
+  frapper(nomOuIndice, force = 0.3) {
+    const i = this.indice(nomOuIndice);
+    if (i < 0) return;
     if (this.mobile[i]) {
       this.xr[i] += force;               // vel = x - xr -> vers le bas
     } else {
@@ -479,18 +551,38 @@ class Simulateur {
     }
   }
 
+  /* Deplace une masse pilotee (posInput) vers une hauteur absolue.
+   * Elle y glisse en douceur (pas de saut = pas de clic audio), et sa
+   * vitesse est reelle : utile pour l'archet et l'amortissement du contact. */
+  placer(nomOuIndice, z) {
+    const i = this.indice(nomOuIndice);
+    if (i < 0 || this.mobile[i]) return;
+    this.cible[i] = z;
+  }
+
   amplitude() {
     let a = 0.0;
     for (let i = 0; i < this.x.length; i++)
-      a = Math.max(a, Math.abs(this.x[i] - this.z_init[i]));
+      if (this.mobile[i]) a = Math.max(a, Math.abs(this.x[i] - this.z_init[i]));
     return a;
+  }
+
+  /* Valeur d'une sortie : deplacement (posOutput) ou force (frcOutput). */
+  sortie(k) {
+    const s = this.sorties[k];
+    if (!s) return 0.0;
+    return s.genre === "frcOutput" ? this.fs[s.i] : this.x[s.i] - this.z_init[s.i];
   }
 
   pas(n = 1) {
     for (let k = 0; k < n; k++) this._unPas();
-    // garde-fou anti-explosion
+    return this.sain();
+  }
+
+  /* garde-fou anti-explosion */
+  sain() {
     for (let i = 0; i < this.x.length; i++) {
-      if (!isFinite(this.x[i]) || Math.abs(this.x[i]) > 1e5) {
+      if (!isFinite(this.x[i]) || Math.abs(this.x[i] - this.z_init[i]) > 1e5) {
         this.reset();
         return false;
       }
@@ -499,77 +591,72 @@ class Simulateur {
   }
 
   _unPas() {
-    const { x, xr, f, xn, mobile, A, B, invM, grav } = this;
+    const { x, xr, f, mobile, A, B, invM, grav, z_init, cible, lissage } = this;
     const n = x.length;
-    // 1) integration des masses (consomme les forces accumulees)
-    for (let i = 0; i < n; i++)
-      xn[i] = A[i] * x[i] + B[i] * xr[i] + (f[i] - grav[i]) * invM[i];
-    for (let i = 0; i < n; i++)
-      if (mobile[i]) { xr[i] = x[i]; x[i] = xn[i]; }
+    // 1) integration des masses autour de leur position de repos
+    for (let i = 0; i < n; i++) {
+      if (!mobile[i]) {                   // ground fixe, posInput pilote
+        xr[i] = x[i];
+        x[i] += (cible[i] - x[i]) * lissage;
+        continue;
+      }
+      const z0 = z_init[i];
+      const xn = z0 + A[i] * (x[i] - z0) + B[i] * (xr[i] - z0)
+               + (f[i] - grav[i]) * invM[i];
+      xr[i] = x[i];
+      x[i] = xn;
+    }
+    if (!this.fs) this.fs = new Float64Array(n);
+    this.fs.set(f);                       // memorise pour frcOutput
     f.fill(0.0);
     // 2) les interactions accumulent les forces pour le pas suivant
-    for (const [genre, lot] of this.lots) {
-      const { i1, i2, args } = lot;
-      for (let k = 0; k < i1.length; k++) {
-        const a = args[k];
-        const p = i1[k], q = i2[k];
-        const d = x[p] - x[q];
-        const dv = (x[p] - xr[p]) - (x[q] - xr[q]);
-        let fv;
-        switch (genre) {
-          case "spring":
-            fv = (a[0] || 0) * d; break;
-          case "damper":
-            fv = (a[0] || 0) * dv; break;
-          case "springDamper":
-            fv = (a[0] || 0) * d + (a[1] || 0) * dv; break;
-          case "contact": {
-            const seuil = a.length > 2 ? a[2] : 0.0;
-            fv = ((a[0] || 0) * (d + seuil) + (a[1] || 0) * dv) * (d > -seuil ? 1 : 0);
-            break;
-          }
-          case "nlContact":
-            fv = Simulateur._nl3Clipped(d, dv, a, true); break;
-          case "nlSpringDamper":
-            fv = Simulateur._nl3Clipped(d, dv, a, false); break;
-          case "nlSpring3":
-            fv = (a[0] || 0) * d + (a[1] || 0) * d ** 3 + (a[2] || 0) * dv; break;
-          case "nlSpring2":
-            fv = (a[0] || 0) * d + (a[1] || 0) * Math.sign(d) * d ** 2 + (a[2] || 0) * dv;
-            break;
-          case "nlPluck":
-            fv = Simulateur._nlPluck(d, dv, a); break;
-          case "nlBow":
-            fv = Simulateur._nlBow(dv, a); break;
-          default:
-            continue;
+    const { code, i1, i2, d0, args, nargs } = this;
+    const NA = Simulateur.NB_ARGS;
+    for (let k = 0; k < code.length; k++) {
+      const p = i1[k], q = i2[k], o = k * NA;
+      const d = x[p] - x[q] - d0[k];
+      const dv = (x[p] - xr[p]) - (x[q] - xr[q]);
+      let fv;
+      switch (code[k]) {
+        case 0: fv = args[o] * d; break;                                   // spring
+        case 1: fv = args[o] * dv; break;                                  // damper
+        case 2: fv = args[o] * d + args[o + 1] * dv; break;                // springDamper
+        case 3: {                                                          // contact
+          const seuil = nargs[k] > 2 ? args[o + 2] : 0.0;
+          fv = d > -seuil ? args[o] * (d + seuil) + args[o + 1] * dv : 0.0;
+          break;
         }
-        f[p] -= fv;
-        f[q] += fv;
+        case 4: fv = Simulateur._nl3Clipped(d, dv, args, o, nargs[k], true); break;
+        case 5: fv = Simulateur._nl3Clipped(d, dv, args, o, nargs[k], false); break;
+        case 6: fv = args[o] * d + args[o + 1] * d * d * d + args[o + 2] * dv; break;
+        case 7: fv = args[o] * d + args[o + 1] * Math.sign(d) * d * d + args[o + 2] * dv; break;
+        case 8: fv = Simulateur._nlPluck(d, dv, args, o, nargs[k]); break;
+        case 9: fv = Simulateur._nlBow(dv, args, o, nargs[k]); break;
+        default: continue;
       }
+      f[p] -= fv;
+      f[q] += fv;
     }
   }
 
   /* ---- non-linearites (portees de migen-lib) ---- */
 
-  static _nl3Clipped(d, dv, a, contact) {
-    const s = a[0] || 0, c = a[1] || 0, k = a[2] || 0, Z = a[3] || 0;
-    const seuil = a.length > 4 ? a[4] : 0.0;
+  static _nl3Clipped(d, dv, a, o, na, contact) {
+    const s = a[o], c = a[o + 1], k = a[o + 2], Z = a[o + 3];
+    const seuil = na > 4 ? a[o + 4] : 0.0;
+    if (contact && !(d > -seuil)) return 0.0;
     const dd = d + (contact ? seuil : 0.0);
-    const b = Math.sqrt(Math.max((k - s) / Math.max(c, 1e-12), 0.0));
     let fv;
     if (c <= 0) fv = s * dd;
     else if (s >= k) fv = k * dd;
-    else if (Math.abs(dd) <= b) fv = s * dd + c * dd ** 3;
+    else if (Math.abs(dd) <= Math.sqrt((k - s) / c)) fv = s * dd + c * dd * dd * dd;
     else fv = k * dd;
-    fv += Z * dv;
-    if (contact) fv *= (d > -seuil ? 1 : 0);
-    return fv;
+    return fv + Z * dv;
   }
 
-  static _nlPluck(d, dv, a) {
-    const nlK = a[0] || 0, scale = Math.max(a[1] || 0, 1e-9);
-    const Z = a.length > 2 ? a[2] : 0.0;
+  static _nlPluck(d, dv, a, o, na) {
+    const nlK = a[o], scale = Math.max(a[o + 1], 1e-9);
+    const Z = na > 2 ? a[o + 2] : 0.0;
     const sharp = 10.0, tip = scale / sharp, Kend = nlK / sharp;
     const ad = Math.abs(d);
     if (ad < tip) return -(nlK - Kend) * d;
@@ -579,9 +666,9 @@ class Simulateur {
     return 0.0;
   }
 
-  static _nlBow(dv, a) {
-    const nlZ = a[0] || 0, scale = Math.max(a[1] || 0, 1e-9);
-    const smooth = a.length > 2 ? a[2] : 0.0;
+  static _nlBow(dv, a, o, na) {
+    const nlZ = a[o], scale = Math.max(a[o + 1], 1e-9);
+    const smooth = na > 2 ? a[o + 2] : 0.0;
     if (smooth >= 1)
       return 0.63 * nlZ * dv * Math.exp(-4 * (dv / scale) ** 2 + 0.5);
     const sharp = 3.0, tip = scale / sharp, Zend = nlZ / sharp;
@@ -592,6 +679,164 @@ class Simulateur {
     return 0.0;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ *  Son temps reel : un pas de calcul par echantillon audio, comme     *
+ *  gen~ dans mi-gen. Les sorties posOutput / frcOutput sont envoyees  *
+ *  aux haut-parleurs (1re sortie a gauche, 2e a droite, etc.).        *
+ * ------------------------------------------------------------------ */
+
+/* Coeur du rendu audio, independant du transport : tourne dans un
+ * AudioWorklet (fil audio) ou, a defaut, dans un ScriptProcessor. */
+class NoyauSon {
+  constructor(sampleRate, poster) {
+    this.poster = poster;
+    this.sim = null;
+    this.gain = 4.0;
+    this.periode = Math.round(sampleRate / 30);    // ~30 images / s vers la vue
+    this.compteur = 0;
+    this.dc = new Float64Array(4);                 // filtres anti-continu L/R
+  }
+
+  message(d) {
+    switch (d.type) {
+      case "modele":
+        this.sim = d.desc ? new Simulateur(d.desc) : null;
+        this._choisitVoies();
+        this.dc.fill(0);
+        break;
+      case "frapper": if (this.sim) this.sim.frapper(d.i, d.force); break;
+      case "placer": if (this.sim) this.sim.placer(d.i, d.z); break;
+      case "reset": if (this.sim) this.sim.reset(); break;
+      case "gain": this.gain = d.v; break;
+    }
+  }
+
+  /* Sans posOutput dans le script, on ecoute deux masses mobiles. */
+  _choisitVoies() {
+    this.secours = null;
+    const s = this.sim;
+    if (!s || s.sorties.length) return;
+    const mob = [];
+    for (let i = 0; i < s.mobile.length; i++) if (s.mobile[i]) mob.push(i);
+    if (mob.length) this.secours = [mob[Math.floor(mob.length / 3)],
+                                    mob[Math.floor(2 * mob.length / 3)]];
+  }
+
+  remplir(L, R) {
+    const s = this.sim;
+    if (!s) { L.fill(0); if (R !== L) R.fill(0); return; }
+    const ns = s.sorties.length, g = this.gain, dc = this.dc;
+    const x = s.x, z0 = s.z_init, sec = this.secours;
+    for (let k = 0; k < L.length; k++) {
+      s._unPas();
+      let l = 0, r = 0;
+      if (ns) {
+        for (let j = 0; j < ns; j++) {
+          const v = s.sortie(j);
+          if (j % 2 === 0) l += v; else r += v;
+        }
+        if (ns === 1) r = l;
+      } else if (sec) {
+        l = x[sec[0]] - z0[sec[0]];
+        r = x[sec[1]] - z0[sec[1]];
+      }
+      // filtre anti-continu (y = x - x1 + 0.995 y1), puis limiteur doux
+      const yl = l - dc[0] + 0.995 * dc[1]; dc[0] = l; dc[1] = yl;
+      const yr = r - dc[2] + 0.995 * dc[3]; dc[2] = r; dc[3] = yr;
+      L[k] = Math.tanh(yl * g);
+      if (R !== L) R[k] = Math.tanh(yr * g);
+    }
+    this.compteur += L.length;
+    if (this.compteur >= this.periode) {
+      this.compteur = 0;
+      if (!s.sain()) this.poster({ type: "explosion" });
+      this.poster({ type: "etat", x: s.x.slice() });
+    }
+  }
+}
+
+const son = {
+  ctx: null,
+  noeud: null,
+  noyau: null,            // seulement en mode secours (ScriptProcessor)
+  actif: false,
+  surMessage: null,
+
+  async demarrer() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) throw new Error("ce navigateur ne gere pas le son (Web Audio)");
+      this.ctx = new AC({ latencyHint: "interactive" });
+      await this._construitNoeud();
+    }
+    await this.ctx.resume();
+    this.actif = true;
+  },
+
+  async _construitNoeud() {
+    const recoit = d => { if (this.surMessage) this.surMessage(d); };
+    if (this.ctx.audioWorklet) {
+      try {
+        const src = `"use strict";
+${Simulateur.toString()}
+${NoyauSon.toString()}
+class MimsProcesseur extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.noyau = new NoyauSon(sampleRate, d => this.port.postMessage(d));
+    this.port.onmessage = e => this.noyau.message(e.data);
+  }
+  process(entrees, sorties) {
+    const o = sorties[0];
+    this.noyau.remplir(o[0], o[1] || o[0]);
+    return true;
+  }
+}
+registerProcessor("mims-son", MimsProcesseur);`;
+        // blob: d'abord ; en file:// Chrome le refuse, data: passe partout
+        const url = URL.createObjectURL(new Blob([src], { type: "application/javascript" }));
+        try {
+          await this.ctx.audioWorklet.addModule(url);
+        } catch (exc) {
+          await this.ctx.audioWorklet.addModule("data:application/javascript;base64," +
+            btoa(unescape(encodeURIComponent(src))));
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+        this.noeud = new AudioWorkletNode(this.ctx, "mims-son",
+          { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+        this.noeud.port.onmessage = e => recoit(e.data);
+        this.noeud.connect(this.ctx.destination);
+        return;
+      } catch (exc) {
+        console.warn("AudioWorklet indisponible, mode secours :", exc);
+      }
+    }
+    // secours : calcul dans le fil principal (moins stable si la page est chargee)
+    this.noyau = new NoyauSon(this.ctx.sampleRate, recoit);
+    this.noeud = this.ctx.createScriptProcessor(1024, 0, 2);
+    this.noeud.onaudioprocess = e => {
+      const b = e.outputBuffer;
+      this.noyau.remplir(b.getChannelData(0), b.getChannelData(1));
+    };
+    this.noeud.connect(this.ctx.destination);
+  },
+
+  envoyer(d) {
+    if (!this.noeud) return;
+    if (this.noyau) this.noyau.message(d);
+    else this.noeud.port.postMessage(d);
+  },
+
+  async arreter() {
+    this.actif = false;
+    this.envoyer({ type: "modele", desc: null });
+    if (this.ctx) await this.ctx.suspend();
+  },
+
+  get frequence() { return this.ctx ? this.ctx.sampleRate : 0; },
+};
 
 /* ------------------------------------------------------------------ *
  *  _source_formes.py — compilateur de formes (forme2mims)             *
@@ -1264,10 +1509,11 @@ const POINTILLES = {
 };
 
 class Vue3D {
-  constructor(canvas, surSelection = null) {
+  constructor(canvas, surSelection = null, surPlacement = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.surSelection = surSelection;
+    this.surPlacement = surPlacement;    // (nom, z) quand on glisse un posInput
 
     this.yaw = 35 * Math.PI / 180;
     this.pitch = 28 * Math.PI / 180;
@@ -1452,7 +1698,17 @@ class Vue3D {
   _pointerDown(e) {
     const [x, y] = this._xy(e);
     this.canvas.setPointerCapture(e.pointerId);
-    if (e.button === 0) this._drag = ["maybe", x, y];
+    const bille = e.button === 0 ? this._billeEntree(x, y) : null;
+    if (bille) {
+      this.selection = bille;
+      const p = this.pos.get(bille);
+      const [, , , s] = this._projette(...p);
+      // pixels ecran par unite verticale, a cette profondeur
+      const echelle = Math.max(this.zoom * s * Math.cos(this.pitch), 1e-3);
+      this._drag = ["bille", y, p[2], bille, echelle];
+      if (this.surSelection) this.surSelection(bille);
+    }
+    else if (e.button === 0) this._drag = ["maybe", x, y];
     else this._drag = ["pan", x, y];     // droit ou milieu = deplacer
     e.preventDefault();
   }
@@ -1461,6 +1717,15 @@ class Vue3D {
     if (this._drag === null) return;
     const [x, y] = this._xy(e);
     const [mode, x0, y0] = this._drag;
+    if (mode === "bille") {
+      const [, yDepart, zDepart, nom, echelle] = this._drag;
+      const z = zDepart - (y - yDepart) / echelle;
+      const p = this.pos.get(nom);
+      if (p) p[2] = z;
+      if (this.surPlacement) this.surPlacement(nom, z);
+      this.redessiner();
+      return;
+    }
     if (mode === "maybe") {
       if (Math.abs(x - x0) + Math.abs(y - y0) < 4) return;
       this._drag = ["orbit", x0, y0];
@@ -1483,6 +1748,18 @@ class Vue3D {
       this._selectionne(x, y);
     }
     this._drag = null;
+  }
+
+  _billeEntree(ex, ey) {
+    if (!this.modele) return null;
+    let meilleur = null, dmin = 14.0;
+    for (const n of this.noms) {
+      if (this.modele.masses.get(n).genre !== "posInput") continue;
+      const [px, py] = this._projette(...this.pos.get(n));
+      const d = Math.hypot(px - ex, py - ey);
+      if (d < dmin) { meilleur = n; dmin = d; }
+    }
+    return meilleur;
   }
 
   _selectionne(ex, ey) {
@@ -1552,7 +1829,9 @@ const app = {
   vue: null,
 
   init() {
-    this.vue = new Vue3D($("vue3d"), n => this._selectionne(n));
+    this.vue = new Vue3D($("vue3d"), n => this._selectionne(n),
+                         (n, z) => this.placer(n, z));
+    son.surMessage = d => this._messageSon(d);
     this.editeur.value = EXEMPLE_DEPART;
     this._construitMenus();
     this._branche();
@@ -1597,6 +1876,8 @@ const app = {
     $("btn-sim").addEventListener("click", () => this.basculeSim());
     $("btn-frapper").addEventListener("click", () => this.frapper());
     $("btn-reset").addEventListener("click", () => this.resetSim());
+    $("btn-son").addEventListener("click", () => this.basculeSon());
+    $("sld-volume").addEventListener("input", () => this._envoieVolume());
 
     this.editeur.addEventListener("input", () => {
       if (!$("chk-auto").checked) return;
@@ -1633,6 +1914,8 @@ const app = {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); this.enregistrer(); }
       if (mod && e.key.toLowerCase() === "o") { e.preventDefault(); $("fichier-mdl").click(); }
+      const saisie = /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
+      if (e.key === " " && !saisie && !mod) { e.preventDefault(); this.frapper(); }
     });
   },
 
@@ -1650,6 +1933,7 @@ const app = {
       this._ligneConsole("note", `note    ligne ${lig} : ${msg}`, lig);
     const etat = modele.erreurs.length ? "ERREURS — corrige puis F5" : "OK";
     this.statut.textContent = `[${etat}]  ${statsModele(modele)}`;
+    if (son.actif) this._chargeSon();
   },
 
   _ligneConsole(classe, texte, lig) {
@@ -1684,6 +1968,10 @@ const app = {
   /* ---------------- simulation ---------------- */
 
   basculeSim() {
+    if (son.actif) {
+      this.statut.textContent = "le son est actif : c'est lui qui fait tourner la simulation";
+      return;
+    }
     if (this.simActive) { this._stopSim(); return; }
     if (!this.modele || this.modele.erreurs.length || !this.modele.masses.size) {
       this.statut.textContent = "corrige les erreurs avant de simuler";
@@ -1704,20 +1992,81 @@ const app = {
   },
 
   resetSim() {
+    if (son.actif) { son.envoyer({ type: "reset" }); return; }
     if (this.sim) { this.sim.reset(); this._afficheSim(); }
   },
 
-  frapper() {
+  _force() { return parseFloat($("sld-force").value); },
+
+  _indice(nom) { return this.modele ? [...this.modele.masses.keys()].indexOf(nom) : -1; },
+
+  /* bille jaune (posInput) glissee a la souris */
+  placer(nom, z) {
+    if (son.actif) { son.envoyer({ type: "placer", i: this._indice(nom), z }); return; }
     if (!this.simActive) this.basculeSim();
-    if (!this.sim) return;
+    if (this.sim) this.sim.placer(nom, z);
+  },
+
+  /* ---------------- son temps reel ---------------- */
+
+  async basculeSon() {
+    const btn = $("btn-son");
+    if (son.actif) {
+      await son.arreter();
+      btn.textContent = "🔈 Son"; btn.classList.remove("actif");
+      $("sld-vitesse").classList.remove("grise"); $("lbl-vitesse").classList.remove("grise");
+      this.statut.textContent = "son coupe";
+      return;
+    }
+    try {
+      await son.demarrer();
+    } catch (exc) {
+      this.statut.textContent = "son impossible : " + exc.message;
+      return;
+    }
+    this._stopSim();
+    btn.textContent = "🔊 Son"; btn.classList.add("actif");
+    $("sld-vitesse").classList.add("grise"); $("lbl-vitesse").classList.add("grise");
+    this._envoieVolume();
+    this._chargeSon();
+  },
+
+  _chargeSon() {
+    const ok = this.modele && !this.modele.erreurs.length && this.modele.masses.size;
+    son.envoyer({ type: "modele", desc: ok ? Simulateur.compiler(this.modele) : null });
+    if (!ok) { this.statut.textContent = "corrige les erreurs pour entendre le modele"; return; }
+    this._mobiles = Uint8Array.from([...this.modele.masses.values()], m => estFixe(m) ? 0 : 1);
+    this._zInit = Float64Array.from([...this.modele.masses.values()], m => m.z);
+    const nb = this.modele.sorties.length;
+    this.statut.textContent = `son actif · ${son.frequence} Hz · ` +
+      (nb ? `${nb} sortie(s) ecoutee(s)` : "pas de posOutput : on ecoute 2 masses de l'objet") +
+      " · espace = frapper";
+  },
+
+  _envoieVolume() {
+    son.envoyer({ type: "gain", v: 10 ** (parseFloat($("sld-volume").value) / 20) });
+  },
+
+  _messageSon(d) {
+    if (d.type === "explosion")
+      this.statut.textContent = "EXPLOSION numerique -> reset (baisse K ou monte Z)";
+    else if (d.type === "etat" && son.actif && this._zInit && d.x.length === this._zInit.length)
+      this._afficheX(d.x, this._zInit, this._mobiles);
+  },
+
+  frapper() {
+    if (!son.actif && !this.simActive) this.basculeSim();
+    if (!son.actif && !this.sim) return;
+    if (!this.modele) return;
     let nom = this.vue.selection;
     if (nom === null || (this.modele.masses.has(nom) && estFixe(this.modele.masses.get(nom)))) {
-      const mobiles = this.sim.noms.filter((n, i) => this.sim.mobile[i]);
+      const mobiles = [...this.modele.masses.values()].filter(m => !estFixe(m)).map(m => m.nom);
       if (!mobiles.length) return;
       nom = mobiles.reduce((a, b) =>
         this.modele.masses.get(b).z > this.modele.masses.get(a).z ? b : a);
     }
-    this.sim.frapper(nom);
+    if (son.actif) son.envoyer({ type: "frapper", i: this._indice(nom), force: this._force() });
+    else this.sim.frapper(nom, this._force());
   },
 
   _tick() {
@@ -1729,11 +2078,23 @@ const app = {
   },
 
   _afficheSim() {
+    this._afficheX(this.sim.x, this.sim.z_init, this.sim.mobile);
+  },
+
+  /* les masses mobiles sont amplifiees, les posInput restent a leur vraie place */
+  _afficheX(x, zi, mobile) {
     const amp = parseFloat($("sld-ampli").value);
-    const { z_init: zi, x } = this.sim;
     const zs = new Float64Array(x.length);
-    for (let i = 0; i < x.length; i++) zs[i] = zi[i] + (x[i] - zi[i]) * amp;
-    this.vue.positionsDynamiques(this.sim.noms, zs);
+    for (let i = 0; i < x.length; i++)
+      zs[i] = mobile[i] ? zi[i] + (x[i] - zi[i]) * amp : x[i];
+    if (!this.vue._drag || this.vue._drag[0] !== "bille")
+      this.vue.positionsDynamiques([...this.modele.masses.keys()], zs);
+    else {                                   // ne pas ecraser la bille tenue
+      const tenue = this.vue._drag[3], noms = [...this.modele.masses.keys()];
+      const k = noms.indexOf(tenue);
+      if (k >= 0) zs[k] = this.vue.pos.get(tenue)[2];
+      this.vue.positionsDynamiques(noms, zs);
+    }
   },
 
   /* ---------------- fichiers ---------------- */
@@ -1853,8 +2214,8 @@ if (location.hash === "#selftest") {
     app.basculeSim();
     if (app.sim) {
       app.sim.frapper(app.sim.noms[3]);
-      app.sim.pas(2000);
-      rapport.push(`simulation 2000 pas ok, amplitude ${app.sim.amplitude().toFixed(4)}`);
+      app.sim.pas(200);
+      rapport.push(`simulation 200 pas ok, amplitude ${app.sim.amplitude().toFixed(4)}`);
     }
     app._stopSim();
     rapport.push("SELFTEST OK");

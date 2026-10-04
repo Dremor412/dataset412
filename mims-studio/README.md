@@ -24,6 +24,45 @@ sur place), et le menu Exemples régénère les formes au lieu de lire le
 dossier `mims-formes-3d`. C'est la solution pour les Mac récents
 (Sequoia et suivants) dont le `python3` d'Apple n'inclut pas tkinter.
 
+## Nouveautés
+
+### Son temps réel (version navigateur)
+
+Bouton **🔈 Son** : la simulation tourne à la fréquence audio, un pas de
+calcul par échantillon, comme `gen~` dans mi-gen. Le calcul se fait dans un
+AudioWorklet, avec un ScriptProcessor en secours.
+
+- Les `posOutput` / `frcOutput` vont aux haut-parleurs : 1re sortie à
+  gauche, 2e à droite, etc. Sans sortie dans le script, on écoute deux
+  masses de l'objet.
+- **Frapper** (ou la **barre espace**) avec le curseur **force**.
+- **Attraper la bille jaune** (`posInput`) et la glisser verticalement pour
+  appuyer, frotter ou pincer l'objet selon l'interaction qui la relie
+  (contact, nlBow, nlPluck). Ça marche aussi sans le son.
+- **volume** : gain en dB avant un limiteur doux (tanh).
+- Les paramètres des formes générées ont été réglés pour l'animation. En
+  son, un `Zo` élevé donne un son très court : baisse-le (ex. `_Zo param
+  0.0005`) pour une résonance plus longue.
+
+### Points de fixation : correction de l'effondrement
+
+Avant, les objets générés s'affaissaient jusqu'à la hauteur des points
+fixes, même sans être frappés. La cause : comme dans mi-gen, les ressorts
+n'ont pas de longueur au repos (`f = K·(x1 − x2)`), mais la hauteur `z`
+sert ici aussi à dessiner la forme. Chaque ressort tirait donc ses deux
+masses à la même hauteur.
+
+Maintenant, les liaisons de structure (`spring`, `damper`, `springDamper`,
+`nlSpring2/3`, `nlSpringDamper`) travaillent sur l'écart à la position de
+repos, et les `osc` oscillent autour de leur propre `z`. C'est la physique
+mi-gen, où le repos joue le rôle du 0. Les interactions « outil »
+(`contact`, `nlContact`, `nlPluck`, `nlBow`) restent en hauteurs absolues :
+ce sont de vraies collisions entre la bille et l'objet.
+
+Vérifié sur les 13 formes : aucune dérive au repos, et retour exact à la
+forme après une frappe. La correction est faite dans les deux versions
+(HTML et Python).
+
 ## Ce que ça fait
 
 - **Éditeur de scripts MIMS** (dialecte du site : masses avec positions 3D
@@ -62,8 +101,6 @@ dossier `mims-formes-3d`. C'est la solution pour les Mac récents
 
 ## Idées pour la suite (non fait)
 
-- Sortie **audio** temps réel des masses `posOutput` (le site le faisait) —
-  demande un module audio (sounddevice) et une simulation à 44,1 kHz.
-- Glisser la bille `posInput` à la souris pendant la simulation.
+- Son temps réel dans la version Python (sounddevice) : fait côté navigateur.
 - Édition graphique : ajouter/relier des masses à la souris.
 - Export du réseau vers le format MIMS4Max (gen~) de Max/MSP.

@@ -1,14 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Simulateur physique 1D par masse (portage fidele du moteur MIMS online).
+"""Simulateur physique 1D par masse (portage du moteur mi-gen / MIMS online).
 
 Chaque masse a un etat scalaire = sa hauteur z. Les [x y] ne servent qu'a
-l'affichage. Schema saute-mouton, ressorts sans longueur au repos —
-exactement comme mimsBrowser.js / migen-lib.
+l'affichage. Schema saute-mouton.
+
+Points de fixation : dans mi-gen les ressorts n'ont pas de longueur au repos
+car l'etat est un deplacement autour de 0. Ici z sert aussi a dessiner la
+forme : les liaisons de structure travaillent donc sur l'ecart a la position
+de repos (et les osc oscillent autour de leur z de repos), sinon l'objet
+s'effondre a la hauteur des points fixes. Les interactions "outil" (contact,
+nlContact, nlPluck, nlBow) restent en hauteurs absolues (vraie collision).
 """
 
 import math
 
 import numpy as np
+
+
+STRUCTURE = ("spring", "damper", "springDamper",
+             "nlSpring2", "nlSpring3", "nlSpringDamper")
 
 
 class Simulateur:
@@ -65,7 +75,9 @@ class Simulateur:
             for k, (_, _, a) in enumerate(lst):
                 for j, v in enumerate(a):
                     args[k, j] = v
-            self.lots[genre] = (i1, i2, args)
+            d0 = (self.z_init[i1] - self.z_init[i2]) if genre in STRUCTURE \
+                else np.zeros(len(lst))
+            self.lots[genre] = (i1, i2, args, d0)
 
     # ------------------------------------------------ etat
 
@@ -74,7 +86,7 @@ class Simulateur:
         self.xr[:] = self.z_init
         self.f[:] = 0.0
 
-    def frapper(self, nom_ou_indice, force=1.2):
+    def frapper(self, nom_ou_indice, force=0.3):
         """Impulsion de vitesse vers le bas sur une masse."""
         i = (self.noms.index(nom_ou_indice)
              if isinstance(nom_ou_indice, str) else nom_ou_indice)
@@ -89,7 +101,8 @@ class Simulateur:
         return dict(zip(self.noms, self.x))
 
     def amplitude(self):
-        return float(np.max(np.abs(self.x - self.z_init))) if len(self.x) else 0.0
+        d = np.abs(self.x - self.z_init)[self.mobile]
+        return float(np.max(d)) if len(d) else 0.0
 
     # ------------------------------------------------ pas de calcul
 
@@ -97,24 +110,25 @@ class Simulateur:
         for _ in range(n):
             self._un_pas()
         # garde-fou anti-explosion
-        if not np.all(np.isfinite(self.x)) or np.max(np.abs(self.x)) > 1e5:
+        if not np.all(np.isfinite(self.x)) or np.max(np.abs(self.x - self.z_init)) > 1e5:
             self.reset()
             return False
         return True
 
     def _un_pas(self):
         x, xr, f = self.x, self.xr, self.f
-        # 1) integration des masses (consomme les forces accumulees)
-        xn = self.A * x + self.B * xr + (f - self.grav) * self.invM
+        # 1) integration des masses autour de leur position de repos
+        z0 = self.z_init
+        xn = z0 + self.A * (x - z0) + self.B * (xr - z0) + (f - self.grav) * self.invM
         xr[self.mobile] = x[self.mobile]
         x[self.mobile] = xn[self.mobile]
         f[:] = 0.0
         # 2) les interactions accumulent les forces pour le pas suivant
         v = x - xr
-        for genre, (i1, i2, a) in self.lots.items():
+        for genre, (i1, i2, a, d0) in self.lots.items():
             x1, x2 = x[i1], x[i2]
             v1, v2 = v[i1], v[i2]
-            d, dv = x1 - x2, v1 - v2
+            d, dv = x1 - x2 - d0, v1 - v2
             if genre == "spring":
                 fv = a[:, 0] * d
             elif genre == "damper":
