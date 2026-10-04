@@ -1,0 +1,1867 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MIMS Studio 0.1.0 — version navigateur</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --fond: #14171c; --panneau: #1d2127; --texte: #d8dee9;
+    --bord: #2a3038; --accent: #5aa9e6; --erreur: #ff7b7b; --note: #c9b458;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 13px/1.4 "Segoe UI", -apple-system, "Helvetica Neue", sans-serif;
+    background: var(--fond); color: var(--texte);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---------- barre de menus ---------- */
+  #menubar { display: flex; background: var(--panneau); border-bottom: 1px solid var(--bord);
+             user-select: none; flex: 0 0 auto; }
+  .menu { position: relative; }
+  .menu > button { background: none; border: none; color: var(--texte);
+                   font: inherit; padding: 6px 12px; cursor: pointer; }
+  .menu > button:hover, .menu.ouvert > button { background: #2a3140; }
+  .menu-liste { display: none; position: absolute; left: 0; top: 100%; z-index: 50;
+                background: #232833; border: 1px solid var(--bord); min-width: 240px;
+                max-height: 70vh; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
+  .menu.ouvert .menu-liste { display: block; }
+  .menu-liste button { display: block; width: 100%; text-align: left; background: none;
+                       border: none; color: var(--texte); font: inherit;
+                       padding: 6px 14px; cursor: pointer; white-space: nowrap; }
+  .menu-liste button:hover { background: #31394a; }
+  .menu-liste hr { border: none; border-top: 1px solid var(--bord); margin: 4px 0; }
+  #titre-app { margin-left: auto; padding: 6px 12px; color: #8892a0; }
+
+  /* ---------- disposition principale ---------- */
+  #main { flex: 1 1 auto; display: flex; min-height: 0; }
+  #gauche { flex: 2 1 0; min-width: 260px; display: flex; flex-direction: column;
+            border-right: 1px solid var(--bord); min-height: 0; }
+  #droite { flex: 3 1 0; min-width: 300px; display: flex; flex-direction: column; min-height: 0; }
+
+  #outils, #simbar { display: flex; align-items: center; gap: 6px; padding: 5px 6px;
+                     flex: 0 0 auto; flex-wrap: wrap; }
+  button.btn { background: #2c3442; color: var(--texte); border: 1px solid #3a4454;
+               border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
+  button.btn:hover { background: #38445a; }
+  label.case { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  input[type="range"] { width: 130px; }
+
+  #editeur { flex: 1 1 auto; width: 100%; resize: none; border: none; outline: none;
+             background: #1d2127; color: #d8dee9; caret-color: #d8dee9;
+             font: 12.5px/1.45 Consolas, Menlo, monospace;
+             padding: 6px 8px; white-space: pre; overflow: auto; tab-size: 4; }
+  #label-problemes { padding: 3px 8px; color: #9aa4b2; flex: 0 0 auto; }
+  #console { flex: 0 0 auto; height: 118px; overflow-y: auto; background: #16191e;
+             border-top: 1px solid var(--bord); font: 11.5px/1.5 Consolas, Menlo, monospace;
+             padding: 3px 0; }
+  #console div { padding: 0 8px; cursor: pointer; white-space: nowrap; }
+  #console div:hover { background: #232833; }
+  #console .err { color: var(--erreur); }
+  #console .note { color: var(--note); }
+
+  #zone-canvas { flex: 1 1 auto; min-height: 0; position: relative; }
+  #vue3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+           background: var(--fond); cursor: grab; touch-action: none; }
+  #statut { padding: 4px 10px; color: #9aa4b2; border-top: 1px solid var(--bord);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; }
+
+  /* ---------- dialogues ---------- */
+  dialog { background: #232833; color: var(--texte); border: 1px solid #3a4454;
+           border-radius: 8px; padding: 18px 22px; min-width: 300px; }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog h3 { margin: 0 0 4px; font-size: 14px; }
+  dialog .desc { color: #9aa4b2; font-style: italic; margin-bottom: 12px; }
+  dialog .champ { display: flex; justify-content: space-between; align-items: center;
+                  gap: 12px; margin: 6px 0; }
+  dialog input[type="number"] { width: 80px; background: #1d2127; color: var(--texte);
+                                border: 1px solid #3a4454; border-radius: 4px; padding: 3px 6px; }
+  dialog .actions { margin-top: 14px; text-align: center; }
+  #dlg-aide pre { font: 12px/1.6 Consolas, Menlo, monospace; white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+
+<div id="menubar">
+  <div class="menu" id="menu-fichier">
+    <button>Fichier</button>
+    <div class="menu-liste">
+      <button data-cmd="nouveau">Nouveau</button>
+      <button data-cmd="ouvrir">Ouvrir un .mdl…&nbsp; (Ctrl/Cmd+O)</button>
+      <button data-cmd="enregistrer">Enregistrer (télécharger)&nbsp; (Ctrl/Cmd+S)</button>
+    </div>
+  </div>
+  <div class="menu" id="menu-generer">
+    <button>Générer</button>
+    <div class="menu-liste" id="liste-generer"></div>
+  </div>
+  <div class="menu" id="menu-importer">
+    <button>Importer</button>
+    <div class="menu-liste">
+      <button data-cmd="obj">Importer un modèle 3D (.obj)…</button>
+    </div>
+  </div>
+  <div class="menu" id="menu-exemples">
+    <button>Exemples</button>
+    <div class="menu-liste" id="liste-exemples"></div>
+  </div>
+  <div class="menu" id="menu-aide">
+    <button>Aide</button>
+    <div class="menu-liste">
+      <button data-cmd="aide">Raccourcis et aide</button>
+    </div>
+  </div>
+  <span id="titre-app">MIMS Studio 0.1.0 — navigateur</span>
+</div>
+
+<div id="main">
+  <div id="gauche">
+    <div id="outils">
+      <button class="btn" id="btn-compiler">▶ Compiler (F5)</button>
+      <label class="case"><input type="checkbox" id="chk-auto" checked> Auto</label>
+      <button class="btn" id="btn-recadrer">Recadrer la vue</button>
+    </div>
+    <textarea id="editeur" spellcheck="false" wrap="off"></textarea>
+    <div id="label-problemes">Problèmes (clic = aller à la ligne) :</div>
+    <div id="console"></div>
+  </div>
+  <div id="droite">
+    <div id="zone-canvas"><canvas id="vue3d"></canvas></div>
+    <div id="simbar">
+      <button class="btn" id="btn-sim">⏵ Simuler</button>
+      <button class="btn" id="btn-frapper">⚡ Frapper</button>
+      <button class="btn" id="btn-reset">⟲ Reset</button>
+      <span>vitesse</span>
+      <input type="range" id="sld-vitesse" min="30" max="1200" value="300">
+      <span>amplification</span>
+      <input type="range" id="sld-ampli" min="1" max="12" step="0.1" value="3">
+    </div>
+    <div id="statut">pret</div>
+  </div>
+</div>
+
+<dialog id="dlg-forme">
+  <h3 id="dlg-forme-titre"></h3>
+  <div class="desc" id="dlg-forme-desc"></div>
+  <div id="dlg-forme-champs"></div>
+  <div class="actions">
+    <button class="btn" id="dlg-forme-go">Insérer dans l'éditeur</button>
+    <button class="btn" data-fermer>Annuler</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-obj">
+  <h3 id="dlg-obj-nom"></h3>
+  <div class="champ"><span>masses visées (0 = toutes)</span>
+    <input type="number" id="obj-masses" min="0" max="1000" value="300"></div>
+  <div class="champ"><span>plafond ressorts (0 = aucun)</span>
+    <input type="number" id="obj-ressorts" min="0" max="3000" value="0"></div>
+  <div class="actions">
+    <button class="btn" id="dlg-obj-go">Importer</button>
+    <button class="btn" data-fermer>Annuler</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-aide">
+  <h3>MIMS Studio — aide</h3>
+  <pre>SOURIS (vue 3D)
+  glisser gauche : orbiter
+  molette / trackpad : zoom
+  glisser droit (ou deux doigts) : deplacer
+  double-clic : recadrer
+  clic simple : selectionner une bille
+
+SIMULATION
+  Simuler : lance la physique (les billes bougent en hauteur)
+  Frapper : impulsion sur la bille selectionnee (ou la plus haute)
+  vitesse : nombre de pas de calcul par image
+  amplification : exagere visuellement le mouvement
+
+COULEURS
+  bleu = masse mobile   rouge = point fixe (ground)
+  jaune = posInput      cercle vert = sortie ecoutee
+  orange pointille = contact   violet = archet   vert = pluck</pre>
+  <div class="actions"><button class="btn" data-fermer>Fermer</button></div>
+</dialog>
+
+<input type="file" id="fichier-mdl" accept=".mdl,text/plain" hidden>
+<input type="file" id="fichier-obj" accept=".obj" hidden>
+
+<script>
+"use strict";
+/* ================================================================== *
+ *  MIMS Studio — portage navigateur (zéro dépendance) du studio      *
+ *  Python/tkinter. Même parseur, même moteur physique (saute-mouton),*
+ *  mêmes générateurs de formes, même import OBJ.                     *
+ * ================================================================== */
+
+/* ------------------------------------------------------------------ *
+ *  model.py                                                           *
+ * ------------------------------------------------------------------ */
+
+const MASSES_FIXES = ["ground", "posInput"];
+const TYPES_MASSE = ["mass", "osc", "ground", "posInput"];
+const TYPES_INTERACTION = ["spring", "damper", "springDamper", "contact", "nlContact",
+                           "nlSpring2", "nlSpring3", "nlSpringDamper", "nlBow", "nlPluck"];
+
+function estFixe(m) { return MASSES_FIXES.includes(m.genre); }
+
+function statsModele(mdl) {
+  let fixes = 0;
+  for (const m of mdl.masses.values()) if (estFixe(m)) fixes++;
+  return `${mdl.masses.size} masses (${fixes} fixes) · ` +
+         `${mdl.interactions.length} interactions · ` +
+         `${mdl.sorties.length} sortie(s) · ` +
+         `${nbComposantes(mdl)} composante(s)`;
+}
+
+function bornesModele(mdl) {
+  if (!mdl.masses.size) return [-10, 10, -10, 10, 0, 10];
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const m of mdl.masses.values()) {
+    x0 = Math.min(x0, m.x); x1 = Math.max(x1, m.x);
+    y0 = Math.min(y0, m.y); y1 = Math.max(y1, m.y);
+    z0 = Math.min(z0, m.z); z1 = Math.max(z1, m.z);
+  }
+  return [x0, x1, y0, y1, z0, z1];
+}
+
+function nbComposantes(mdl) {
+  const noms = [...mdl.masses.keys()];
+  if (!noms.length) return 0;
+  const idx = new Map(noms.map((n, i) => [n, i]));
+  const parent = noms.map((_, i) => i);
+  function find(a) {
+    while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; }
+    return a;
+  }
+  for (const it of mdl.interactions) {
+    if (idx.has(it.m1) && idx.has(it.m2)) {
+      const ra = find(idx.get(it.m1)), rb = find(idx.get(it.m2));
+      if (ra !== rb) parent[ra] = rb;
+    }
+  }
+  const racines = new Set();
+  for (let i = 0; i < noms.length; i++) racines.add(find(i));
+  return racines.size;
+}
+
+/* ------------------------------------------------------------------ *
+ *  parser_mdl.py                                                      *
+ * ------------------------------------------------------------------ */
+
+const RE_BRACKET = /\[([^\]]*)\]/;
+
+function motsDe(s) {
+  const t = s.trim();
+  return t ? t.split(/\s+/) : [];
+}
+
+function _nombre(token, params, avert, ligne) {
+  if (token !== "" && !isNaN(Number(token))) return Number(token);
+  if (Object.prototype.hasOwnProperty.call(params, token)) return params[token];
+  avert.push([ligne, `parametre inconnu '${token}' (remplace par 0)`]);
+  return 0.0;
+}
+
+function _position(brut, params, avert, ligne) {
+  const vals = motsDe(brut).map(t => _nombre(t, params, avert, ligne));
+  if (vals.length === 3) return vals;
+  if (vals.length === 1) return [0.0, 0.0, vals[0]];
+  avert.push([ligne, `position mal formee '[${brut}]' (attendu 1 ou 3 valeurs)`]);
+  return [0.0, 0.0, 0.0];
+}
+
+function parse(texte) {
+  const mdl = { masses: new Map(), interactions: [], sorties: [],
+                params: {}, erreurs: [], avertissements: [] };
+  const err = mdl.erreurs, avert = mdl.avertissements;
+  const lignes = texte.split(/\r?\n/);
+
+  /* ---- passe 1 : les parametres */
+  lignes.forEach((brute, i) => {
+    const num = i + 1;
+    const ligne = brute.split("#")[0].trim();
+    if (!ligne || !ligne.startsWith("@")) return;
+    const parts = motsDe(ligne);
+    if (parts.length >= 3 && (parts[1] === "param" || parts[1] === "audioParam")) {
+      const nom = parts[0].slice(1);
+      const v = Number(parts[2]);
+      if (parts[2] !== "" && !isNaN(v)) {
+        mdl.params[nom] = v;
+      } else {
+        mdl.params[nom] = 0.0;
+        if (parts[1] === "param")
+          avert.push([num, `valeur de param invalide '${parts[2]}'`]);
+      }
+    }
+  });
+
+  /* ---- passe 2 : masses, interactions, entrees / sorties */
+  lignes.forEach((brute, i) => {
+    const num = i + 1;
+    const ligne = brute.split("#")[0].trim();
+    if (!ligne || ligne.startsWith("~")) return;
+    if (!ligne.startsWith("@")) {
+      avert.push([num, `ligne ignoree (ne commence pas par @) : '${ligne.slice(0, 40)}'`]);
+      return;
+    }
+    const parts = motsDe(ligne);
+    if (parts.length < 2) { err.push([num, "ligne incomplete"]); return; }
+    const nom = parts[0].slice(1), genre = parts[1];
+
+    if (genre === "param" || genre === "audioParam") return;
+
+    /* -------- masses (avec position) -------- */
+    if (TYPES_MASSE.includes(genre)) {
+      let x, y, z, avant, apres;
+      const m = RE_BRACKET.exec(ligne);
+      if (m) {
+        [x, y, z] = _position(m[1], mdl.params, avert, num);
+        avant = motsDe(ligne.slice(0, m.index)).slice(2);
+        apres = motsDe(ligne.slice(m.index + m[0].length));
+      } else {
+        const toks = parts.slice(2);
+        if (genre === "ground" || genre === "posInput") {
+          avant = []; apres = [];
+          x = 0.0; y = 0.0;
+          z = toks.length ? _nombre(toks[0], mdl.params, avert, num) : 0.0;
+        } else {
+          // dialecte scalaire : M [grav] pos vel
+          if (toks.length < 3) {
+            err.push([num, `pas assez d'arguments pour ${genre}`]);
+            return;
+          }
+          avant = toks.slice(0, -2);
+          x = 0.0; y = 0.0;
+          z = _nombre(toks[toks.length - 2], mdl.params, avert, num);
+          apres = [toks[toks.length - 1]];
+        }
+      }
+      const vel = apres.length ? _nombre(apres[0], mdl.params, avert, num) : 0.0;
+      const args = avant.map(t => _nombre(t, mdl.params, avert, num));
+
+      if (genre === "mass" && !args.length) {
+        err.push([num, "mass : il faut au moins la masse M"]); return;
+      }
+      if (genre === "osc" && args.length < 3) {
+        err.push([num, "osc : il faut M K Z"]); return;
+      }
+      if (mdl.masses.has(nom)) {
+        err.push([num, `nom duplique : @${nom}`]); return;
+      }
+      mdl.masses.set(nom, { nom, genre, x, y, z, vel, args, ligne: num });
+      return;
+    }
+
+    /* -------- interactions -------- */
+    if (TYPES_INTERACTION.includes(genre)) {
+      const refs = parts.slice(2).filter(t => t.startsWith("@")).map(t => t.slice(1));
+      const autres = parts.slice(2).filter(t => !t.startsWith("@"));
+      const iCrochet = ligne.indexOf("[");
+      if (iCrochet >= 0 && ligne.slice(iCrochet).includes("@")) {
+        err.push([num, "syntaxe macro '[@s pos]' non supportee ici : " +
+                       "utilise des masses explicites (dialecte du site)"]);
+        return;
+      }
+      if (refs.length !== 2) {
+        err.push([num, `${genre} : il faut exactement 2 masses (@a @b)`]);
+        return;
+      }
+      const args = autres.map(t => _nombre(t, mdl.params, avert, num));
+      mdl.interactions.push({ nom, genre, m1: refs[0], m2: refs[1], args, ligne: num });
+      return;
+    }
+
+    /* -------- entrees / sorties -------- */
+    if (genre === "frcInput") {
+      const refs = parts.slice(2).filter(t => t.startsWith("@")).map(t => t.slice(1));
+      if (refs.length)
+        avert.push([num, `frcInput @${refs[0]} : force externe non simulee (ok)`]);
+      return;
+    }
+    if (genre === "posOutput" || genre === "frcOutput") {
+      const refs = parts.slice(2).filter(t => t.startsWith("@")).map(t => t.slice(1));
+      if (!refs.length) {
+        err.push([num, `${genre} : il faut une masse cible (@m)`]); return;
+      }
+      mdl.sorties.push({ nom, genre, cible: refs[0], ligne: num });
+      return;
+    }
+
+    err.push([num, `type de module inconnu : '${genre}'`]);
+  });
+
+  /* ---- passe 3 : verification des references */
+  for (const it of mdl.interactions)
+    for (const ref of [it.m1, it.m2])
+      if (!mdl.masses.has(ref))
+        mdl.erreurs.push([it.ligne, `masse inconnue @${ref} dans ${it.nom}`]);
+  for (const s of mdl.sorties)
+    if (!mdl.masses.has(s.cible))
+      mdl.erreurs.push([s.ligne, `masse inconnue @${s.cible} dans ${s.nom}`]);
+
+  return mdl;
+}
+
+/* ------------------------------------------------------------------ *
+ *  simulator.py — moteur saute-mouton (portage fidele, sans numpy)    *
+ * ------------------------------------------------------------------ */
+
+class Simulateur {
+  constructor(modele) {
+    this.noms = [...modele.masses.keys()];
+    const idx = new Map(this.noms.map((n, i) => [n, i]));
+    const n = this.noms.length;
+
+    this.x = new Float64Array(n);
+    this.xr = new Float64Array(n);
+    this.f = new Float64Array(n);
+    this.xn = new Float64Array(n);
+    this.mobile = new Uint8Array(n);
+    this.A = new Float64Array(n).fill(2.0);
+    this.B = new Float64Array(n).fill(-1.0);
+    this.invM = new Float64Array(n).fill(1.0);
+    this.grav = new Float64Array(n);
+    this.z_init = new Float64Array(n);
+
+    this.noms.forEach((nom, i) => {
+      const m = modele.masses.get(nom);
+      this.z_init[i] = m.z;
+      this.x[i] = m.z;
+      this.xr[i] = m.z - m.vel;          // vitesse initiale
+      if (estFixe(m)) return;
+      this.mobile[i] = 1;
+      if (m.genre === "mass") {
+        const M = m.args.length ? m.args[0] : 1.0;
+        const g = m.args.length > 1 ? m.args[1] : 0.0;
+        this.invM[i] = 1.0 / Math.max(M, 1e-9);
+        this.grav[i] = g;
+      } else if (m.genre === "osc") {
+        const [M, K, Z] = m.args;
+        const g = m.args.length > 3 ? m.args[3] : 0.0;
+        const invM = 1.0 / Math.max(M, 1e-9);
+        this.invM[i] = invM;
+        this.A[i] = 2.0 - (K + Z) * invM;
+        this.B[i] = Z * invM - 1.0;
+        this.grav[i] = g;
+      }
+    });
+
+    // interactions groupees par genre
+    this.lots = new Map();               // genre -> {i1, i2, args[][]}
+    for (const it of modele.interactions) {
+      if (!idx.has(it.m1) || !idx.has(it.m2)) continue;
+      if (!this.lots.has(it.genre)) this.lots.set(it.genre, { i1: [], i2: [], args: [] });
+      const lot = this.lots.get(it.genre);
+      lot.i1.push(idx.get(it.m1));
+      lot.i2.push(idx.get(it.m2));
+      lot.args.push(it.args);
+    }
+  }
+
+  reset() {
+    this.x.set(this.z_init);
+    this.xr.set(this.z_init);
+    this.f.fill(0.0);
+  }
+
+  frapper(nomOuIndice, force = 1.2) {
+    const i = typeof nomOuIndice === "string"
+      ? this.noms.indexOf(nomOuIndice) : nomOuIndice;
+    if (this.mobile[i]) {
+      this.xr[i] += force;               // vel = x - xr -> vers le bas
+    } else {
+      for (let j = 0; j < this.xr.length; j++)
+        if (this.mobile[j]) this.xr[j] += force * 0.15;
+    }
+  }
+
+  amplitude() {
+    let a = 0.0;
+    for (let i = 0; i < this.x.length; i++)
+      a = Math.max(a, Math.abs(this.x[i] - this.z_init[i]));
+    return a;
+  }
+
+  pas(n = 1) {
+    for (let k = 0; k < n; k++) this._unPas();
+    // garde-fou anti-explosion
+    for (let i = 0; i < this.x.length; i++) {
+      if (!isFinite(this.x[i]) || Math.abs(this.x[i]) > 1e5) {
+        this.reset();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  _unPas() {
+    const { x, xr, f, xn, mobile, A, B, invM, grav } = this;
+    const n = x.length;
+    // 1) integration des masses (consomme les forces accumulees)
+    for (let i = 0; i < n; i++)
+      xn[i] = A[i] * x[i] + B[i] * xr[i] + (f[i] - grav[i]) * invM[i];
+    for (let i = 0; i < n; i++)
+      if (mobile[i]) { xr[i] = x[i]; x[i] = xn[i]; }
+    f.fill(0.0);
+    // 2) les interactions accumulent les forces pour le pas suivant
+    for (const [genre, lot] of this.lots) {
+      const { i1, i2, args } = lot;
+      for (let k = 0; k < i1.length; k++) {
+        const a = args[k];
+        const p = i1[k], q = i2[k];
+        const d = x[p] - x[q];
+        const dv = (x[p] - xr[p]) - (x[q] - xr[q]);
+        let fv;
+        switch (genre) {
+          case "spring":
+            fv = (a[0] || 0) * d; break;
+          case "damper":
+            fv = (a[0] || 0) * dv; break;
+          case "springDamper":
+            fv = (a[0] || 0) * d + (a[1] || 0) * dv; break;
+          case "contact": {
+            const seuil = a.length > 2 ? a[2] : 0.0;
+            fv = ((a[0] || 0) * (d + seuil) + (a[1] || 0) * dv) * (d > -seuil ? 1 : 0);
+            break;
+          }
+          case "nlContact":
+            fv = Simulateur._nl3Clipped(d, dv, a, true); break;
+          case "nlSpringDamper":
+            fv = Simulateur._nl3Clipped(d, dv, a, false); break;
+          case "nlSpring3":
+            fv = (a[0] || 0) * d + (a[1] || 0) * d ** 3 + (a[2] || 0) * dv; break;
+          case "nlSpring2":
+            fv = (a[0] || 0) * d + (a[1] || 0) * Math.sign(d) * d ** 2 + (a[2] || 0) * dv;
+            break;
+          case "nlPluck":
+            fv = Simulateur._nlPluck(d, dv, a); break;
+          case "nlBow":
+            fv = Simulateur._nlBow(dv, a); break;
+          default:
+            continue;
+        }
+        f[p] -= fv;
+        f[q] += fv;
+      }
+    }
+  }
+
+  /* ---- non-linearites (portees de migen-lib) ---- */
+
+  static _nl3Clipped(d, dv, a, contact) {
+    const s = a[0] || 0, c = a[1] || 0, k = a[2] || 0, Z = a[3] || 0;
+    const seuil = a.length > 4 ? a[4] : 0.0;
+    const dd = d + (contact ? seuil : 0.0);
+    const b = Math.sqrt(Math.max((k - s) / Math.max(c, 1e-12), 0.0));
+    let fv;
+    if (c <= 0) fv = s * dd;
+    else if (s >= k) fv = k * dd;
+    else if (Math.abs(dd) <= b) fv = s * dd + c * dd ** 3;
+    else fv = k * dd;
+    fv += Z * dv;
+    if (contact) fv *= (d > -seuil ? 1 : 0);
+    return fv;
+  }
+
+  static _nlPluck(d, dv, a) {
+    const nlK = a[0] || 0, scale = Math.max(a[1] || 0, 1e-9);
+    const Z = a.length > 2 ? a[2] : 0.0;
+    const sharp = 10.0, tip = scale / sharp, Kend = nlK / sharp;
+    const ad = Math.abs(d);
+    if (ad < tip) return -(nlK - Kend) * d;
+    if (ad < scale)
+      return d > 0 ? -tip * nlK + Kend * d + Z * dv
+                   : tip * nlK + Kend * d + Z * dv;
+    return 0.0;
+  }
+
+  static _nlBow(dv, a) {
+    const nlZ = a[0] || 0, scale = Math.max(a[1] || 0, 1e-9);
+    const smooth = a.length > 2 ? a[2] : 0.0;
+    if (smooth >= 1)
+      return 0.63 * nlZ * dv * Math.exp(-4 * (dv / scale) ** 2 + 0.5);
+    const sharp = 3.0, tip = scale / sharp, Zend = nlZ / sharp;
+    const av = Math.abs(dv);
+    if (av < tip) return (nlZ - Zend) * dv;
+    if (av < scale)
+      return dv > 0 ? tip * nlZ - Zend * dv : -tip * nlZ - Zend * dv;
+    return 0.0;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  _source_formes.py — compilateur de formes (forme2mims)             *
+ * ------------------------------------------------------------------ */
+
+class GenModele {
+  constructor(nom, M = 1.0, K = 0.1, Z = 0.0001, Zo = 0.01) {
+    this.nom = nom;
+    this.M = M; this.K = K; this.Z = Z; this.Zo = Zo;
+    this.masses = [];          // {id, x, y, z, grounded}
+    this.ressorts = new Set(); // "a,b" avec a < b
+    this.sortiesIds = [];
+    this.entree = null;        // {x, y, z, cible}
+  }
+  masse(x, y, z, grounded = false) {
+    const id = this.masses.length;
+    this.masses.push({ id, x, y, z, grounded });
+    return id;
+  }
+  ressort(a, b) {
+    if (a !== b) this.ressorts.add(`${Math.min(a, b)},${Math.max(a, b)}`);
+  }
+  ecoute(id) { this.sortiesIds.push(id); }
+  frappe(id, hauteurAuDessus = 5.0) {
+    const m = this.masses[id];
+    this.entree = { x: m.x, y: m.y, z: m.z + hauteurAuDessus, cible: id };
+  }
+  sommetLePlusHaut() {
+    let best = this.masses[0];
+    for (const m of this.masses) if (m.z > best.z) best = m;
+    return best.id;
+  }
+  script(note = "") {
+    const n = this.nom;
+    const L = [`# MIMS script genere par forme2mims (MIMS Studio) — objet 3D : ${n}`];
+    if (note) L.push(`# ${note}`);
+    L.push("# L'objet touche le sol (base z=0, pieds ground).");
+    L.push("# Attrape la bille jaune (posInput) et descends-la sur l'objet.");
+    L.push("");
+    L.push(`@${n}_M param ${this.M}`);
+    L.push(`@${n}_K param ${this.K}`);
+    L.push(`@${n}_Z param ${this.Z}`);
+    L.push(`@${n}_Zo param ${this.Zo}`);
+    L.push("");
+    for (const m of this.masses) {
+      const pos = `[${m.x.toFixed(2)} ${m.y.toFixed(2)} ${m.z.toFixed(2)}]`;
+      if (m.grounded) L.push(`@${n}_m${m.id} ground ${pos}`);
+      else L.push(`@${n}_m${m.id} osc ${n}_M 0 ${n}_Zo ${pos} 0`);
+    }
+    L.push("");
+    const paires = [...this.ressorts].map(s => s.split(",").map(Number))
+      .sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+    paires.forEach(([a, b], i) => {
+      L.push(`@${n}_r${i} springDamper @${n}_m${a} @${n}_m${b} ${n}_K ${n}_Z`);
+    });
+    L.push("");
+    if (this.entree) {
+      const e = this.entree;
+      L.push(`@in1 posInput [${e.x.toFixed(2)} ${e.y.toFixed(2)} ${e.z.toFixed(2)}]`);
+      L.push(`@${n}_exc contact @${n}_m${e.cible} @in1 0.1 0.001`);
+    }
+    this.sortiesIds.forEach((id, i) => {
+      L.push(`@out${i + 1} posOutput @${n}_m${id}`);
+    });
+    L.push("");
+    L.push(`# ${this.masses.length} masses, ${this.ressorts.size} interactions`);
+    L.push("# end of MIMS script");
+    return L.join("\n");
+  }
+}
+
+const TAU = 2 * Math.PI;
+
+function formeBoite(nx = 6, ny = 6, nz = 6, taille = 14.0, hauteur = 14.0) {
+  const m = new GenModele("boite");
+  const ids = new Map();
+  const k3 = (i, j, k) => `${i},${j},${k}`;
+  for (let i = 0; i < nx; i++)
+    for (let j = 0; j < ny; j++)
+      for (let k = 0; k < nz; k++) {
+        const x = -taille / 2 + taille * i / (nx - 1);
+        const y = -taille / 2 + taille * j / (ny - 1);
+        const z = hauteur * k / (nz - 1);
+        const pied = k === 0 && (i === 0 || i === nx - 1) && (j === 0 || j === ny - 1);
+        ids.set(k3(i, j, k), m.masse(x, y, z, pied));
+      }
+  for (let i = 0; i < nx; i++)
+    for (let j = 0; j < ny; j++)
+      for (let k = 0; k < nz; k++) {
+        if (i + 1 < nx) m.ressort(ids.get(k3(i, j, k)), ids.get(k3(i + 1, j, k)));
+        if (j + 1 < ny) m.ressort(ids.get(k3(i, j, k)), ids.get(k3(i, j + 1, k)));
+        if (k + 1 < nz) m.ressort(ids.get(k3(i, j, k)), ids.get(k3(i, j, k + 1)));
+      }
+  m.frappe(ids.get(k3(Math.floor(nx / 2), Math.floor(ny / 2), nz - 1)));
+  m.ecoute(ids.get(k3(Math.floor(nx / 2), 0, Math.floor(nz / 2))));
+  m.ecoute(ids.get(k3(0, Math.floor(ny / 2), Math.floor(nz / 2))));
+  return [m, `boite ${nx}x${ny}x${nz}, base au sol, 4 pieds ground aux coins`];
+}
+
+function formePyramide(base = 7, etages = 5, taille = 16.0, hauteur = 12.0) {
+  const m = new GenModele("pyramide");
+  const couches = [];
+  for (let k = 0; k < etages; k++) {
+    const cote = base - k;
+    const span = taille * cote / base;
+    const z = etages > 1 ? hauteur * k / (etages - 1) : 0.0;
+    const couche = new Map();
+    for (let i = 0; i < cote; i++)
+      for (let j = 0; j < cote; j++) {
+        const x = -span / 2 + (cote > 1 ? span * i / (cote - 1) : 0.0);
+        const y = -span / 2 + (cote > 1 ? span * j / (cote - 1) : 0.0);
+        const pied = k === 0 && (i === 0 || i === cote - 1) && (j === 0 || j === cote - 1);
+        couche.set(`${i},${j}`, m.masse(x, y, z, pied));
+      }
+    couches.push([cote, couche]);
+  }
+  couches.forEach(([cote, couche], k) => {
+    for (let i = 0; i < cote; i++)
+      for (let j = 0; j < cote; j++) {
+        if (i + 1 < cote) m.ressort(couche.get(`${i},${j}`), couche.get(`${i + 1},${j}`));
+        if (j + 1 < cote) m.ressort(couche.get(`${i},${j}`), couche.get(`${i},${j + 1}`));
+        if (k + 1 < etages) {
+          const [coteH, coucheH] = couches[k + 1];
+          const dec = Math.floor((cote - coteH) / 2);
+          const ih = Math.min(Math.max(i - dec, 0), coteH - 1);
+          const jh = Math.min(Math.max(j - dec, 0), coteH - 1);
+          if (Math.abs(i - ih - dec) <= 1 && Math.abs(j - jh - dec) <= 1)
+            m.ressort(couche.get(`${i},${j}`), coucheH.get(`${ih},${jh}`));
+        }
+      }
+  });
+  m.frappe(m.sommetLePlusHaut());
+  const [cote0, couche0] = couches[0];
+  m.ecoute(couche0.get(`${Math.floor(cote0 / 2)},0`));
+  m.ecoute(couche0.get(`0,${Math.floor(cote0 / 2)}`));
+  return [m, `pyramide de ${etages} etages sur base ${base}x${base}`];
+}
+
+function formeTour(etages = 8, secteurs = 12, rayon = 4.5, hauteur = 16.0) {
+  const m = new GenModele("tour");
+  const ids = new Map();
+  for (let k = 0; k < etages; k++) {
+    const z = hauteur * k / (etages - 1);
+    for (let s = 0; s < secteurs; s++) {
+      const a = TAU * s / secteurs;
+      ids.set(`${k},${s}`, m.masse(rayon * Math.cos(a), rayon * Math.sin(a), z, k === 0));
+    }
+  }
+  for (let k = 0; k < etages; k++)
+    for (let s = 0; s < secteurs; s++) {
+      m.ressort(ids.get(`${k},${s}`), ids.get(`${k},${(s + 1) % secteurs}`));
+      if (k + 1 < etages) {
+        m.ressort(ids.get(`${k},${s}`), ids.get(`${k + 1},${s}`));
+        m.ressort(ids.get(`${k},${s}`), ids.get(`${k + 1},${(s + 1) % secteurs}`));
+      }
+    }
+  m.frappe(ids.get(`${etages - 1},0`));
+  m.ecoute(ids.get(`${Math.floor(etages / 2)},${Math.floor(secteurs / 3)}`));
+  m.ecoute(ids.get(`${etages - 1},${Math.floor(secteurs / 2)}`));
+  return [m, `tour/cloche ${etages} etages x ${secteurs} secteurs, base scellee au sol`];
+}
+
+function formeSphere(meridiens = 12, paralleles = 9, rayon = 7.0) {
+  const m = new GenModele("sphere");
+  const sud = m.masse(0.0, 0.0, 0.0, true);
+  const nord = m.masse(0.0, 0.0, 2 * rayon);
+  const anneaux = [];
+  for (let p = 1; p <= paralleles; p++) {
+    const theta = Math.PI * p / (paralleles + 1);
+    const rr = rayon * Math.sin(theta);
+    const z = rayon * (1 - Math.cos(theta));
+    const anneau = [];
+    for (let s = 0; s < meridiens; s++)
+      anneau.push(m.masse(rr * Math.cos(TAU * s / meridiens),
+                          rr * Math.sin(TAU * s / meridiens), z));
+    anneaux.push(anneau);
+  }
+  anneaux.forEach((anneau, p) => {
+    for (let s = 0; s < meridiens; s++) {
+      m.ressort(anneau[s], anneau[(s + 1) % meridiens]);
+      if (p + 1 < anneaux.length) m.ressort(anneau[s], anneaux[p + 1][s]);
+    }
+    if (p === 0) for (let s = 0; s < meridiens; s++) m.ressort(sud, anneau[s]);
+    if (p === anneaux.length - 1)
+      for (let s = 0; s < meridiens; s++) m.ressort(nord, anneau[s]);
+  });
+  m.frappe(nord);
+  m.ecoute(anneaux[Math.floor(anneaux.length / 2)][0]);
+  m.ecoute(anneaux[Math.floor(anneaux.length / 2)][Math.floor(meridiens / 2)]);
+  return [m, `sphere ${meridiens}x${paralleles}, pole sud ancre au sol`];
+}
+
+function formeTore(nu = 20, nv = 8, R = 6.0, r = 2.2) {
+  const m = new GenModele("tore");
+  const ids = new Map();
+  let zMin = null;
+  for (let u = 0; u < nu; u++) {
+    const au = TAU * u / nu - Math.PI / 2;
+    for (let v = 0; v < nv; v++) {
+      const av = TAU * v / nv;
+      const rr = R + r * Math.cos(av);
+      const x = rr * Math.cos(au);
+      const z = rr * Math.sin(au) + R + r;
+      const y = r * Math.sin(av);
+      ids.set(`${u},${v}`, m.masse(x, y, z));
+      if (zMin === null || z < zMin) zMin = z;
+    }
+  }
+  // ancre les masses les plus basses (le point de contact avec le sol)
+  for (const id of ids.values())
+    if (m.masses[id].z < zMin + 0.6) m.masses[id].grounded = true;
+  for (let u = 0; u < nu; u++)
+    for (let v = 0; v < nv; v++) {
+      m.ressort(ids.get(`${u},${v}`), ids.get(`${(u + 1) % nu},${v}`));
+      m.ressort(ids.get(`${u},${v}`), ids.get(`${u},${(v + 1) % nv}`));
+    }
+  let haut = 0;
+  for (const id of ids.values()) if (m.masses[id].z > m.masses[haut].z) haut = id;
+  m.frappe(haut);
+  m.ecoute(ids.get(`${Math.floor(nu / 4)},0`));
+  m.ecoute(ids.get(`${Math.floor(3 * nu / 4)},${Math.floor(nv / 2)}`));
+  return [m, `tore debout ${nu}x${nv} (roue), point de contact ancre au sol`];
+}
+
+function formeCloche(anneaux = 10, secteurs = 16, rBouche = 7.0, rCouronne = 2.8, H = 14.0) {
+  const m = new GenModele("cloche", 1.0, 0.1, 0.00005, 0.002);
+  const ids = new Map();
+  for (let k = 0; k < anneaux; k++) {
+    const t = (anneaux - 1 - k) / (anneaux - 1);
+    const r = rCouronne + (rBouche - rCouronne) * t ** 1.8;
+    const z = 0.5 + (H - 0.5) * k / (anneaux - 1);
+    for (let s = 0; s < secteurs; s++) {
+      const a = TAU * s / secteurs;
+      ids.set(`${k},${s}`, m.masse(r * Math.cos(a), r * Math.sin(a), z, k === anneaux - 1));
+    }
+  }
+  for (let k = 0; k < anneaux; k++)
+    for (let s = 0; s < secteurs; s++) {
+      m.ressort(ids.get(`${k},${s}`), ids.get(`${k},${(s + 1) % secteurs}`));
+      if (k + 1 < anneaux) {
+        m.ressort(ids.get(`${k},${s}`), ids.get(`${k + 1},${s}`));
+        m.ressort(ids.get(`${k},${s}`), ids.get(`${k + 1},${(s + 1) % secteurs}`));
+      }
+    }
+  m.frappe(ids.get("1,0"));
+  m.ecoute(ids.get(`0,${Math.floor(secteurs / 2)}`));
+  m.ecoute(ids.get(`2,${Math.floor(secteurs / 3)}`));
+  return [m, "cloche a profil evase, couronne fixee, bouche libre — laisse-la resonner"];
+}
+
+function formeGrossecaisse(secteurs = 20, R = 8.0, H = 5.0) {
+  const m = new GenModele("grossecaisse", 2.0, 0.06, 0.0002, 0.01);
+  const fut = new Map();
+  [0.0, H / 2, H].forEach((z, k) => {
+    for (let s = 0; s < secteurs; s++) {
+      const a = TAU * s / secteurs;
+      fut.set(`${k},${s}`, m.masse(R * Math.cos(a), R * Math.sin(a), z, k === 0));
+    }
+  });
+  for (let k = 0; k < 3; k++)
+    for (let s = 0; s < secteurs; s++) {
+      m.ressort(fut.get(`${k},${s}`), fut.get(`${k},${(s + 1) % secteurs}`));
+      if (k + 1 < 3) m.ressort(fut.get(`${k},${s}`), fut.get(`${k + 1},${s}`));
+    }
+
+  function peau(z, anneauBord) {
+    const centre = m.masse(0.0, 0.0, z);
+    let prec = new Array(secteurs).fill(centre);
+    for (let ai = 1; ai < 4; ai++) {                   // 3 anneaux internes
+      const rr = R * ai / 4;
+      const cour = [];
+      for (let s = 0; s < secteurs; s++)
+        cour.push(m.masse(rr * Math.cos(TAU * s / secteurs),
+                          rr * Math.sin(TAU * s / secteurs), z));
+      for (let s = 0; s < secteurs; s++) {
+        m.ressort(cour[s], cour[(s + 1) % secteurs]);
+        m.ressort(prec[ai > 1 ? s : 0], cour[s]);
+      }
+      prec = cour;
+    }
+    for (let s = 0; s < secteurs; s++) m.ressort(prec[s], anneauBord[s]);
+    return centre;
+  }
+
+  const bordHaut = [], bordBas = [];
+  for (let s = 0; s < secteurs; s++) {
+    bordHaut.push(fut.get(`2,${s}`));
+    bordBas.push(fut.get(`0,${s}`));
+  }
+  const cHaut = peau(H, bordHaut);
+  const cBas = peau(0.0, bordBas);
+  m.frappe(cHaut);
+  m.ecoute(cBas);
+  m.ecoute(cHaut);
+  return [m, "grosse caisse : peau de frappe + peau de resonance couplees par le fut"];
+}
+
+function formeDonutcoupe(nu = 22, nv = 8, nuPlein = 28, R = 6.5, r = 2.2) {
+  const m = new GenModele("donutcoupe", 1.0, 0.1, 0.0001, 0.004);
+  const ids = new Map();
+  for (let u = 0; u < nu; u++) {
+    const au = TAU * u / nuPlein;
+    for (let v = 0; v < nv; v++) {
+      const av = TAU * v / nv;
+      const rr = R + r * Math.cos(av);
+      const z = r + r * Math.sin(av);
+      ids.set(`${u},${v}`, m.masse(rr * Math.cos(au), rr * Math.sin(au), z, z < 0.15));
+    }
+  }
+  for (let u = 0; u < nu; u++)
+    for (let v = 0; v < nv; v++) {
+      m.ressort(ids.get(`${u},${v}`), ids.get(`${u},${(v + 1) % nv}`));
+      if (u + 1 < nu)                                  // pas de rebouclage : coupe !
+        m.ressort(ids.get(`${u},${v}`), ids.get(`${u + 1},${v}`));
+    }
+  m.frappe(ids.get(`0,${Math.floor(nv / 4)}`));
+  m.ecoute(ids.get(`${nu - 1},${Math.floor(nv / 4)}`));
+  m.ecoute(ids.get(`${Math.floor(nu / 2)},0`));
+  return [m, "donut coupe : la part manquante libere deux bords vifs (mode splitting)"];
+}
+
+function formeColimacon(n = 90, tours = 3, R0 = 9.0, H = 13.0) {
+  const m = new GenModele("colimacon", 0.8, 0.12, 0.0001, 0.003);
+  const parTour = Math.floor(n / tours);
+  const ids = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const r = R0 * Math.exp(Math.log(0.28) * t);
+    const a = TAU * tours * t;
+    ids.push(m.masse(r * Math.cos(a), r * Math.sin(a), H * t, i < 3));
+  }
+  for (let i = 0; i < n - 1; i++) m.ressort(ids[i], ids[i + 1]);
+  for (let i = 0; i < n - parTour; i++) m.ressort(ids[i], ids[i + parTour]);
+  m.frappe(ids[n - 1]);
+  m.ecoute(ids[Math.floor(n / 2)]);
+  m.ecoute(ids[parTour]);
+  return [m, "spirale logarithmique : auto-similarite -> cascade de resonances (chirp)"];
+}
+
+function formeFibonacci() {
+  const m = new GenModele("fibonacci", 1.0, 0.1, 0.00008, 0.002);
+  const nb = 25;
+  const socle = [];
+  for (let i = 0; i < nb; i++)
+    socle.push(m.masse(-12 + 24 * i / (nb - 1), 0.0, 0.0, i === 0 || i === nb - 1));
+  for (let i = 0; i < nb - 1; i++) m.ressort(socle[i], socle[i + 1]);
+  const tailles = [3, 8, 21, 13, 5];
+  const tips = [];
+  tailles.forEach((taille, ti) => {
+    const baseIdx = Math.round(ti * (nb - 1) / 4);
+    let prec = socle[baseIdx];
+    const x = -12 + 24 * baseIdx / (nb - 1);
+    for (let j = 0; j < taille; j++) {
+      const nid = m.masse(x, 0.0, 0.9 * (j + 1));
+      m.ressort(prec, nid);
+      prec = nid;
+    }
+    tips.push(prec);
+  });
+  m.frappe(socle[3]);
+  m.ecoute(tips[2]);
+  m.ecoute(tips[3]);
+  return [m, "orgue de Fibonacci : rapports ~nombre d'or = inharmonicite maximale"];
+}
+
+function formeMoebius(nu = 36, R = 7.0, d = 1.3) {
+  const m = new GenModele("moebius", 1.0, 0.1, 0.0001, 0.003);
+  const ids = new Map();
+  for (let ui = 0; ui < nu; ui++) {
+    const u = TAU * ui / nu;
+    [-d, 0.0, d].forEach((w, wi) => {
+      const rad = R + w * Math.cos(u / 2);
+      const z = w * Math.sin(u / 2) + d;
+      ids.set(`${ui},${wi}`, m.masse(rad * Math.cos(u), rad * Math.sin(u), z, z < 0.25));
+    });
+  }
+  for (let ui = 0; ui < nu; ui++)
+    for (let wi = 0; wi < 3; wi++) {
+      if (wi + 1 < 3) m.ressort(ids.get(`${ui},${wi}`), ids.get(`${ui},${wi + 1}`));
+      if (ui + 1 < nu) m.ressort(ids.get(`${ui},${wi}`), ids.get(`${ui + 1},${wi}`));
+      else m.ressort(ids.get(`${ui},${wi}`), ids.get(`0,${2 - wi}`)); // recollement inverse !
+    }
+  let haut = ids.get("0,0");
+  for (const id of ids.values()) if (m.masses[id].z > m.masses[haut].z) haut = id;
+  m.frappe(haut);
+  m.ecoute(ids.get(`${Math.floor(nu / 4)},1`));
+  m.ecoute(ids.get(`${Math.floor(3 * nu / 4)},1`));
+  return [m, "ruban de Moebius : recollement inverse = modes a demi-periode"];
+}
+
+function formeSablier(anneaux = 9, secteurs = 14, H = 14.0, rCol = 2.2, s = 4.0) {
+  const m = new GenModele("sablier", 1.0, 0.1, 0.00008, 0.002);
+  const ids = new Map();
+  for (let k = 0; k < anneaux; k++) {
+    const z = H * k / (anneaux - 1);
+    const r = rCol * Math.cosh((z - H / 2) / s);
+    for (let sct = 0; sct < secteurs; sct++) {
+      const a = TAU * sct / secteurs;
+      ids.set(`${k},${sct}`, m.masse(r * Math.cos(a), r * Math.sin(a), z, k === 0));
+    }
+  }
+  for (let k = 0; k < anneaux; k++)
+    for (let sct = 0; sct < secteurs; sct++) {
+      m.ressort(ids.get(`${k},${sct}`), ids.get(`${k},${(sct + 1) % secteurs}`));
+      if (k + 1 < anneaux) {
+        m.ressort(ids.get(`${k},${sct}`), ids.get(`${k + 1},${sct}`));
+        m.ressort(ids.get(`${k},${sct}`), ids.get(`${k + 1},${(sct + 1) % secteurs}`));
+      }
+    }
+  m.frappe(ids.get(`${anneaux - 1},0`));
+  m.ecoute(ids.get(`1,${Math.floor(secteurs / 2)}`));
+  m.ecoute(ids.get(`${anneaux - 2},${Math.floor(secteurs / 2)}`));
+  return [m, "sablier/catenoide : col etroit = couplage faible -> battements lents"];
+}
+
+function formeArbre() {
+  const m = new GenModele("arbre", 0.9, 0.11, 0.0001, 0.0025);
+  const tips = [];
+
+  function branche(depart, x, y, z, dx, dy, dz, n, niveau) {
+    let prec = depart;
+    for (let j = 1; j <= n; j++) {
+      const nid = m.masse(x + dx * j, y + dy * j, z + dz * j);
+      m.ressort(prec, nid);
+      prec = nid;
+    }
+    if (niveau === 0) { tips.push(prec); return; }
+    const bx = x + dx * n, by = y + dy * n, bz = z + dz * n;
+    const pas = dz * 0.78;
+    const nSuiv = Math.max(2, Math.trunc(n / 1.6));
+    if (niveau % 2 === 0) {                            // alterne les plans x / y
+      branche(prec, bx, by, bz, 0.8 * pas, 0, pas, nSuiv, niveau - 1);
+      branche(prec, bx, by, bz, -0.8 * pas, 0, pas, nSuiv, niveau - 1);
+    } else {
+      branche(prec, bx, by, bz, 0, 0.8 * pas, pas, nSuiv, niveau - 1);
+      branche(prec, bx, by, bz, 0, -0.8 * pas, pas, nSuiv, niveau - 1);
+    }
+  }
+
+  const racine = m.masse(0.0, 0.0, 0.0, true);
+  branche(racine, 0, 0, 0, 0, 0, 1.3, 7, 3);           // tronc de 7 puis 3 divisions
+  const sommetTronc = 7;                               // derniere masse du tronc
+  m.frappe(sommetTronc);
+  m.ecoute(tips[0]);
+  m.ecoute(tips[tips.length - 1]);
+  return [m, "arbre binaire auto-similaire : longueurs /1.6 -> resonances quasi-octaves"];
+}
+
+/* ---------------- import OBJ (avec simplification) ---------------- */
+
+function _simplifieSommets(verts, edges, cible) {
+  if (cible <= 0 || verts.length <= cible) return [verts, edges, false];
+
+  let diag = 0;
+  for (let k = 0; k < 3; k++) {
+    let mn = Infinity, mx = -Infinity;
+    for (const v of verts) { mn = Math.min(mn, v[k]); mx = Math.max(mx, v[k]); }
+    diag = Math.max(diag, mx - mn);
+  }
+  diag = Math.max(diag, 1e-9);
+
+  function clusterise(h) {
+    const groupes = new Map();
+    verts.forEach((v, i) => {
+      const cle = `${Math.floor(v[0] / h)},${Math.floor(v[1] / h)},${Math.floor(v[2] / h)}`;
+      if (!groupes.has(cle)) groupes.set(cle, []);
+      groupes.get(cle).push(i);
+    });
+    return groupes;
+  }
+
+  // recherche dichotomique de la taille de cellule qui approche la cible
+  let lo = diag / 300.0, hi = diag, meilleur = null;
+  for (let it = 0; it < 40; it++) {
+    const h = (lo + hi) / 2;
+    const groupes = clusterise(h);
+    const n = groupes.size;
+    if (meilleur === null || Math.abs(n - cible) < Math.abs(meilleur.size - cible))
+      meilleur = groupes;
+    if (n > cible) lo = h;               // trop de groupes -> cellules plus grandes
+    else hi = h;
+  }
+  const groupes = meilleur;
+
+  const clesTriees = [...groupes.keys()].map(k => k.split(",").map(Number))
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  const vmap = new Array(verts.length).fill(0);
+  const nverts = [];
+  clesTriees.forEach((cle, ci) => {
+    const idxs = groupes.get(cle.join(","));
+    const moy = [0, 0, 0];
+    for (const i of idxs) for (let k = 0; k < 3; k++) moy[k] += verts[i][k];
+    nverts.push(moy.map(v => v / idxs.length));
+    for (const i of idxs) vmap[i] = ci;
+  });
+  const nedges = new Set();
+  for (const cle of edges) {
+    const [a, b] = cle.split(",").map(Number);
+    const ca = vmap[a], cb = vmap[b];
+    if (ca !== cb) nedges.add(`${Math.min(ca, cb)},${Math.max(ca, cb)}`);
+  }
+  return [nverts, nedges, true];
+}
+
+function _limiteRessorts(verts, edges, plafond) {
+  if (plafond <= 0 || edges.size <= plafond) return [edges, false];
+
+  const paires = [...edges].map(s => s.split(",").map(Number));
+  function d2([a, b]) {
+    const va = verts[a], vb = verts[b];
+    let s = 0;
+    for (let k = 0; k < 3; k++) s += (va[k] - vb[k]) ** 2;
+    return s;
+  }
+  paires.sort((p, q) => d2(p) - d2(q));
+
+  const parent = verts.map((_, i) => i);
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+
+  const squelette = [], restantes = [];
+  for (const e of paires) {
+    const ra = find(e[0]), rb = find(e[1]);
+    if (ra !== rb) { parent[ra] = rb; squelette.push(e); }  // connexite
+    else restantes.push(e);
+  }
+  for (const e of restantes) {
+    if (squelette.length >= plafond) break;
+    squelette.push(e);
+  }
+  return [new Set(squelette.map(([a, b]) => `${a},${b}`)), true];
+}
+
+function formeObj(nomFichier, texte, masses = 400, ressorts = 0,
+                  cible = 16.0, maxMasses = 1000) {
+  let verts = [];
+  let edges = new Set();
+  for (const ligne of texte.split(/\r?\n/)) {
+    const p = motsDe(ligne);
+    if (!p.length) continue;
+    if (p[0] === "v") {
+      verts.push(p.slice(1, 4).map(Number));
+    } else if (p[0] === "f") {
+      const idx = p.slice(1).map(t => parseInt(t.split("/")[0], 10) - 1);
+      for (let k = 0; k < idx.length; k++) {
+        const a = idx[k], b = idx[(k + 1) % idx.length];
+        edges.add(`${Math.min(a, b)},${Math.max(a, b)}`);
+      }
+    }
+  }
+  if (!verts.length) throw new Error("aucun sommet 'v' trouve dans ce fichier .obj");
+
+  const nVerts0 = verts.length, nEdges0 = edges.size;
+  let simplifie;
+  [verts, edges, simplifie] = _simplifieSommets(verts, edges, masses);
+
+  if (verts.length > maxMasses)
+    throw new Error(`${verts.length} masses apres simplification : trop pour le navigateur ` +
+                    `(max ~${maxMasses}). Utilise masses visees <= ${maxMasses}.`);
+
+  // Blender exporte en general Y vers le haut -> axe vertical = Y si plus etendu
+  const etendue = k => Math.max(...verts.map(v => v[k])) - Math.min(...verts.map(v => v[k]));
+  if (etendue(1) > etendue(2)) verts = verts.map(v => [v[0], v[2], v[1]]);
+  const cx = verts.reduce((s, v) => s + v[0], 0) / verts.length;
+  const cy = verts.reduce((s, v) => s + v[1], 0) / verts.length;
+  const zmin = Math.min(...verts.map(v => v[2]));
+  verts = verts.map(v => [v[0] - cx, v[1] - cy, v[2] - zmin]);
+  const ampl = Math.max(...verts.map(v => Math.max(Math.abs(v[0]), Math.abs(v[1]), v[2])));
+  const kEch = cible / Math.max(ampl, 1e-9);
+  verts = verts.map(v => [v[0] * kEch, v[1] * kEch, v[2] * kEch]);
+
+  let limite;
+  [edges, limite] = _limiteRessorts(verts, edges, ressorts);
+
+  let nom = nomFichier.replace(/\.[^.]*$/, "").slice(0, 12) || "objet";
+  nom = nom.replace(/[^A-Za-z0-9]/g, "_");
+  const m = new GenModele(nom);
+  const zmax = Math.max(...verts.map(v => v[2]));
+  const seuilPied = 0.04 * zmax;
+  const ids = verts.map(v => m.masse(v[0], v[1], v[2], v[2] <= seuilPied));
+  const paires = [...edges].map(s => s.split(",").map(Number))
+    .sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  for (const [a, b] of paires) m.ressort(ids[a], ids[b]);
+  m.frappe(m.sommetLePlusHaut());
+  m.ecoute(ids[Math.floor(ids.length / 3)]);
+  m.ecoute(ids[Math.floor(2 * ids.length / 3)]);
+  const nPieds = m.masses.filter(mm => mm.grounded).length;
+  let note = `importe de ${nomFichier} : ${nVerts0} sommets / ${nEdges0} aretes d'origine`;
+  if (simplifie) note += ` -> simplifie a ${verts.length} masses`;
+  if (limite) note += `, ressorts plafonnes a ${edges.size}`;
+  note += `, ${nPieds} pieds au sol`;
+  return [m, note];
+}
+
+/* ---------------- catalogue (generators.py) ---------------- */
+
+const CATALOGUE = {
+  boite: [p => formeBoite(p.nx | 0, p.ny | 0, p.nz | 0),
+          "Cube gelatineux pose au sol",
+          { nx: ["largeur (billes)", 6, 2, 12],
+            ny: ["profondeur", 6, 2, 12],
+            nz: ["hauteur", 6, 2, 12] }],
+  pyramide: [p => formePyramide(p.base | 0, p.etages | 0),
+             "Pyramide a etages carres",
+             { base: ["cote de la base", 7, 3, 12],
+               etages: ["etages", 5, 2, 8] }],
+  tour: [p => formeTour(p.etages | 0, p.secteurs | 0),
+         "Cylindre / cloche simple, base scellee",
+         { etages: ["etages", 8, 3, 16],
+           secteurs: ["secteurs", 12, 6, 24] }],
+  sphere: [p => formeSphere(p.meridiens | 0, p.paralleles | 0),
+           "Sphere posee au sol",
+           { meridiens: ["meridiens", 12, 6, 24],
+             paralleles: ["paralleles", 9, 4, 16] }],
+  tore: [p => formeTore(p.nu | 0, p.nv | 0),
+         "Tore debout comme une roue",
+         { nu: ["grand cercle", 20, 8, 36],
+           nv: ["section", 8, 4, 12] }],
+  cloche: [p => formeCloche(p.anneaux | 0, p.secteurs | 0),
+           "Cloche a profil evase, couronne fixee",
+           { anneaux: ["anneaux", 10, 4, 16],
+             secteurs: ["secteurs", 16, 8, 24] }],
+  grossecaisse: [p => formeGrossecaisse(p.secteurs | 0),
+                 "Deux peaux couplees par un fut",
+                 { secteurs: ["secteurs", 20, 8, 28] }],
+  donutcoupe: [p => formeDonutcoupe(p.nu | 0, p.nv | 0),
+               "Donut a plat auquel il manque une part",
+               { nu: ["sections gardees", 22, 6, 40],
+                 nv: ["section", 8, 4, 12] }],
+  colimacon: [p => formeColimacon(p.n | 0),
+              "Spirale logarithmique montante (chirp)",
+              { n: ["nombre de billes", 90, 20, 200] }],
+  fibonacci: [() => formeFibonacci(),
+              "Orgue du nombre d'or (inharmonique)", {}],
+  moebius: [p => formeMoebius(p.nu | 0),
+            "Ruban de Moebius (modes a demi-periode)",
+            { nu: ["sections", 36, 12, 60] }],
+  sablier: [() => formeSablier(),
+            "Catenoide : deux chambres couplees (battements)", {}],
+  arbre: [() => formeArbre(),
+          "Arbre binaire auto-similaire (quasi-octaves)", {}],
+};
+
+function genere(nom, params) {
+  const [fabrique] = CATALOGUE[nom];
+  const [modele, note] = fabrique(params);
+  return [modele.script(note), note];
+}
+
+/* ------------------------------------------------------------------ *
+ *  view3d.py — vue 3D sur canvas (orbite, zoom, panoramique)          *
+ * ------------------------------------------------------------------ */
+
+const COULEURS = {
+  fond: "#14171c", grille: "#2a3038",
+  axe_x: "#7a4040", axe_y: "#40603f",
+  mass: "#5aa9e6", osc: "#5aa9e6",
+  ground: "#e05555", posInput: "#f4d03f",
+  sortie: "#58d68d", selection: "#ffffff",
+  spring: "#5f6f80", damper: "#4a5560", springDamper: "#7d8fa3",
+  contact: "#e08b3d", nlContact: "#e08b3d",
+  nlPluck: "#58d68d", nlBow: "#b07cc6",
+  nlSpring2: "#4fb3a9", nlSpring3: "#4fb3a9", nlSpringDamper: "#4fb3a9",
+};
+const POINTILLES = {
+  contact: [4, 3], nlContact: [4, 3], nlPluck: [2, 3],
+  nlBow: [6, 3], damper: [1, 3],
+};
+
+class Vue3D {
+  constructor(canvas, surSelection = null) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.surSelection = surSelection;
+
+    this.yaw = 35 * Math.PI / 180;
+    this.pitch = 28 * Math.PI / 180;
+    this.zoom = 14.0;
+    this.panx = 0.0; this.pany = 0.0;
+    this.cible = [0.0, 0.0, 5.0];
+    this.persp = 60.0;
+
+    this.modele = null;
+    this.noms = [];
+    this.pos = new Map();                // nom -> [x, y, z]
+    this.selection = null;
+    this._sorties = new Set();
+    this._drag = null;
+
+    canvas.addEventListener("pointerdown", e => this._pointerDown(e));
+    canvas.addEventListener("pointermove", e => this._pointerMove(e));
+    canvas.addEventListener("pointerup", e => this._pointerUp(e));
+    canvas.addEventListener("pointercancel", () => { this._drag = null; });
+    canvas.addEventListener("dblclick", () => this.recadrer());
+    canvas.addEventListener("contextmenu", e => e.preventDefault());
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      const brut = e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY;
+      this._zoomPas(-brut / 120);
+    }, { passive: false });
+
+    this._taillePrete = false;
+    this._ro = new ResizeObserver(() => this._retaille());
+    this._ro.observe(canvas);
+    window.addEventListener("resize", () => this._retaille());
+    this._retaille();
+    requestAnimationFrame(() => this._retaille());     // filet apres 1re mise en page
+  }
+
+  _retaille() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (w < 1 || h < 1) return;
+    const nw = Math.round(w * dpr), nh = Math.round(h * dpr);
+    const change = this.canvas.width !== nw || this.canvas.height !== nh;
+    if (change) {
+      this.canvas.width = nw;
+      this.canvas.height = nh;
+    }
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!this._taillePrete) {
+      this._taillePrete = true;
+      this.recadrer();                 // 1re taille valide : cadre le modele
+    } else if (change) {
+      this.redessiner();
+    }
+  }
+
+  /* ---------------- modele ---------------- */
+
+  charger(modele) {
+    this.modele = modele;
+    this.noms = modele ? [...modele.masses.keys()] : [];
+    this.pos = new Map();
+    if (modele)
+      for (const [n, m] of modele.masses) this.pos.set(n, [m.x, m.y, m.z]);
+    this._sorties = modele ? new Set(modele.sorties.map(s => s.cible)) : new Set();
+    if (!this.pos.has(this.selection)) this.selection = null;
+    this.recadrer();
+  }
+
+  positionsDynamiques(noms, zs) {
+    for (let i = 0; i < noms.length; i++) {
+      const p = this.pos.get(noms[i]);
+      if (p) p[2] = zs[i];
+    }
+    this.redessiner();
+  }
+
+  recadrer() {
+    if (!this.modele || !this.modele.masses.size) { this.redessiner(); return; }
+    const [x0, x1, y0, y1, z0, z1] = bornesModele(this.modele);
+    this.cible = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
+    const etendue = Math.max(x1 - x0, y1 - y0, z1 - z0, 4.0);
+    const w = Math.max(this.canvas.clientWidth, 300);
+    const h = Math.max(this.canvas.clientHeight, 300);
+    this.zoom = 0.75 * Math.min(w, h) / etendue;
+    this.panx = this.pany = 0.0;
+    this.redessiner();
+  }
+
+  /* ---------------- projection ---------------- */
+
+  _projette(x, y, z) {
+    const ca = Math.cos(this.yaw), sa = Math.sin(this.yaw);
+    const cb = Math.cos(this.pitch), sb = Math.sin(this.pitch);
+    const dx = x - this.cible[0], dy = y - this.cible[1], dz = z - this.cible[2];
+    const X = dx * ca + dy * sa;
+    const Y = -dx * sa + dy * ca;
+    const Z2 = -Y * sb + dz * cb;        // vertical ecran
+    const prof = Y * cb + dz * sb;       // profondeur
+    const s = this.persp / Math.max(this.persp + prof * 0.04, 0.2);
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    return [w / 2 + this.zoom * s * X + this.panx,
+            h / 2 - this.zoom * s * Z2 + this.pany, prof, s];
+  }
+
+  /* ---------------- dessin ---------------- */
+
+  redessiner() {
+    const ctx = this.ctx;
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    ctx.fillStyle = COULEURS.fond;
+    ctx.fillRect(0, 0, w, h);
+    this._grille();
+    if (!this.modele) return;
+
+    // interactions
+    for (const it of this.modele.interactions) {
+      const p1 = this.pos.get(it.m1), p2 = this.pos.get(it.m2);
+      if (!p1 || !p2) continue;
+      const [x1, y1] = this._projette(...p1);
+      const [x2, y2] = this._projette(...p2);
+      ctx.strokeStyle = COULEURS[it.genre] || "#666666";
+      ctx.lineWidth = 1;
+      ctx.setLineDash(POINTILLES[it.genre] || []);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // masses (triees par profondeur : lointaines d'abord)
+    const projetees = this.noms.map(n => {
+      const [px, py, prof, s] = this._projette(...this.pos.get(n));
+      return [prof, n, px, py, s];
+    });
+    projetees.sort((a, b) => b[0] - a[0]);
+    for (const [, n, px, py, s] of projetees) {
+      const m = this.modele.masses.get(n);
+      const r = Math.max(2.0, (m.genre === "posInput" ? 5.5 : 3.6) * s);
+      ctx.fillStyle = COULEURS[m.genre] || "#aaaaaa";
+      if (m.genre === "ground") {
+        ctx.fillRect(px - r, py - r, 2 * r, 2 * r);
+      } else {
+        ctx.beginPath(); ctx.arc(px, py, r, 0, TAU); ctx.fill();
+      }
+      if (this._sorties.has(n)) {
+        ctx.strokeStyle = COULEURS.sortie; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(px, py, r + 3, 0, TAU); ctx.stroke();
+      }
+      if (n === this.selection) {
+        ctx.strokeStyle = COULEURS.selection; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(px, py, r + 4, 0, TAU); ctx.stroke();
+      }
+    }
+  }
+
+  _grille() {
+    const ctx = this.ctx;
+    const L = 20, pas = 5;
+    ctx.strokeStyle = COULEURS.grille;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = -L; i <= L; i += pas) {
+      for (const [a, b] of [[[i, -L, 0], [i, L, 0]], [[-L, i, 0], [L, i, 0]]]) {
+        const [x1, y1] = this._projette(...a);
+        const [x2, y2] = this._projette(...b);
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      }
+    }
+    ctx.stroke();
+    for (const [axe, coul] of [[[L, 0, 0], COULEURS.axe_x], [[0, L, 0], COULEURS.axe_y]]) {
+      const [x1, y1] = this._projette(0, 0, 0);
+      const [x2, y2] = this._projette(...axe);
+      ctx.strokeStyle = coul; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+
+  /* ---------------- souris ---------------- */
+
+  _xy(e) {
+    const r = this.canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+
+  _pointerDown(e) {
+    const [x, y] = this._xy(e);
+    this.canvas.setPointerCapture(e.pointerId);
+    if (e.button === 0) this._drag = ["maybe", x, y];
+    else this._drag = ["pan", x, y];     // droit ou milieu = deplacer
+    e.preventDefault();
+  }
+
+  _pointerMove(e) {
+    if (this._drag === null) return;
+    const [x, y] = this._xy(e);
+    const [mode, x0, y0] = this._drag;
+    if (mode === "maybe") {
+      if (Math.abs(x - x0) + Math.abs(y - y0) < 4) return;
+      this._drag = ["orbit", x0, y0];
+      return this._pointerMove(e);
+    }
+    if (mode === "orbit") {
+      this.yaw += (x - x0) * 0.008;
+      this.pitch = Math.min(Math.max(this.pitch + (y - y0) * 0.008, -1.4), 1.5);
+    } else {                             // pan
+      this.panx += x - x0;
+      this.pany += y - y0;
+    }
+    this._drag = [mode, x, y];
+    this.redessiner();
+  }
+
+  _pointerUp(e) {
+    if (this._drag && this._drag[0] === "maybe") {
+      const [x, y] = this._xy(e);
+      this._selectionne(x, y);
+    }
+    this._drag = null;
+  }
+
+  _selectionne(ex, ey) {
+    let meilleur = null, dmin = 12.0;
+    for (const n of this.noms) {
+      const [px, py] = this._projette(...this.pos.get(n));
+      const d = Math.hypot(px - ex, py - ey);
+      if (d < dmin) { meilleur = n; dmin = d; }
+    }
+    this.selection = meilleur;
+    if (this.surSelection) this.surSelection(meilleur);
+    this.redessiner();
+  }
+
+  _zoomPas(pas) {
+    this.zoom *= 1.1 ** pas;
+    this.zoom = Math.min(Math.max(this.zoom, 0.5), 400);
+    this.redessiner();
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  ui_main.py — application                                           *
+ * ------------------------------------------------------------------ */
+
+const EXEMPLE_DEPART = `# Bienvenue dans MIMS Studio (version navigateur) !
+# Colle ici un script MIMS, ouvre un .mdl, ou menu Generer.
+# Clic gauche = orbiter, molette = zoom, clic droit = deplacer,
+# clic simple sur une bille = la selectionner, puis bouton Frapper.
+
+@demo_M param 1.0
+@demo_K param 0.1
+@demo_Z param 0.0001
+@demo_Zo param 0.01
+
+@demo_m0 ground [-6.00 0.00 0.00]
+@demo_m1 osc demo_M 0 demo_Zo [-4.00 0.00 0.00] 0
+@demo_m2 osc demo_M 0 demo_Zo [-2.00 0.00 0.00] 0
+@demo_m3 osc demo_M 0 demo_Zo [0.00 0.00 0.00] 0
+@demo_m4 osc demo_M 0 demo_Zo [2.00 0.00 0.00] 0
+@demo_m5 osc demo_M 0 demo_Zo [4.00 0.00 0.00] 0
+@demo_m6 ground [6.00 0.00 0.00]
+
+@demo_r0 springDamper @demo_m0 @demo_m1 demo_K demo_Z
+@demo_r1 springDamper @demo_m1 @demo_m2 demo_K demo_Z
+@demo_r2 springDamper @demo_m2 @demo_m3 demo_K demo_Z
+@demo_r3 springDamper @demo_m3 @demo_m4 demo_K demo_Z
+@demo_r4 springDamper @demo_m4 @demo_m5 demo_K demo_Z
+@demo_r5 springDamper @demo_m5 @demo_m6 demo_K demo_Z
+
+@out1 posOutput @demo_m3
+`;
+
+const $ = id => document.getElementById(id);
+
+const app = {
+  modele: null,
+  sim: null,
+  simActive: false,
+  _timer: null,
+  _autoId: null,
+  fichierNom: null,
+
+  editeur: $("editeur"),
+  console: $("console"),
+  statut: $("statut"),
+  vue: null,
+
+  init() {
+    this.vue = new Vue3D($("vue3d"), n => this._selectionne(n));
+    this.editeur.value = EXEMPLE_DEPART;
+    this._construitMenus();
+    this._branche();
+    this.compiler();
+  },
+
+  /* ---------------- menus ---------------- */
+
+  _construitMenus() {
+    const lg = $("liste-generer"), le = $("liste-exemples");
+    for (const nom of Object.keys(CATALOGUE)) {
+      const desc = CATALOGUE[nom][1];
+      const b1 = document.createElement("button");
+      b1.textContent = `${nom} — ${desc}`;
+      b1.addEventListener("click", () => this.dialogueForme(nom));
+      lg.appendChild(b1);
+      const b2 = document.createElement("button");
+      b2.textContent = `${nom}.mdl`;
+      b2.addEventListener("click", () => this.exempleForme(nom));
+      le.appendChild(b2);
+    }
+
+    // ouverture / fermeture des menus
+    const menus = [...document.querySelectorAll(".menu")];
+    for (const menu of menus) {
+      menu.querySelector(":scope > button").addEventListener("click", e => {
+        e.stopPropagation();
+        const etait = menu.classList.contains("ouvert");
+        menus.forEach(m => m.classList.remove("ouvert"));
+        if (!etait) menu.classList.add("ouvert");
+      });
+    }
+    document.addEventListener("click", () => menus.forEach(m => m.classList.remove("ouvert")));
+    document.querySelectorAll(".menu-liste").forEach(liste =>
+      liste.addEventListener("click", () =>
+        menus.forEach(m => m.classList.remove("ouvert"))));
+  },
+
+  _branche() {
+    $("btn-compiler").addEventListener("click", () => this.compiler());
+    $("btn-recadrer").addEventListener("click", () => this.vue.recadrer());
+    $("btn-sim").addEventListener("click", () => this.basculeSim());
+    $("btn-frapper").addEventListener("click", () => this.frapper());
+    $("btn-reset").addEventListener("click", () => this.resetSim());
+
+    this.editeur.addEventListener("input", () => {
+      if (!$("chk-auto").checked) return;
+      clearTimeout(this._autoId);
+      this._autoId = setTimeout(() => this.compiler(), 500);
+    });
+
+    document.querySelectorAll("[data-cmd]").forEach(b => {
+      const cmd = b.dataset.cmd;
+      b.addEventListener("click", () => {
+        if (cmd === "nouveau") this.nouveau();
+        else if (cmd === "ouvrir") $("fichier-mdl").click();
+        else if (cmd === "enregistrer") this.enregistrer();
+        else if (cmd === "obj") $("fichier-obj").click();
+        else if (cmd === "aide") $("dlg-aide").showModal();
+      });
+    });
+    document.querySelectorAll("[data-fermer]").forEach(b =>
+      b.addEventListener("click", () => b.closest("dialog").close()));
+
+    $("fichier-mdl").addEventListener("change", async e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (f) this.chargeTexte(await f.text(), f.name);
+    });
+    $("fichier-obj").addEventListener("change", async e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (f) this.dialogueObj(f.name, await f.text());
+    });
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "F5") { e.preventDefault(); this.compiler(); }
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); this.enregistrer(); }
+      if (mod && e.key.toLowerCase() === "o") { e.preventDefault(); $("fichier-mdl").click(); }
+    });
+  },
+
+  /* ---------------- compilation ---------------- */
+
+  compiler() {
+    this._stopSim();
+    const modele = parse(this.editeur.value);
+    this.modele = modele;
+    this.vue.charger(modele);
+    this.console.innerHTML = "";
+    for (const [lig, msg] of modele.erreurs)
+      this._ligneConsole("err", `ERREUR  ligne ${lig} : ${msg}`, lig);
+    for (const [lig, msg] of modele.avertissements)
+      this._ligneConsole("note", `note    ligne ${lig} : ${msg}`, lig);
+    const etat = modele.erreurs.length ? "ERREURS — corrige puis F5" : "OK";
+    this.statut.textContent = `[${etat}]  ${statsModele(modele)}`;
+  },
+
+  _ligneConsole(classe, texte, lig) {
+    const div = document.createElement("div");
+    div.className = classe;
+    div.textContent = texte;
+    div.addEventListener("click", () => this._vaLigne(lig));
+    this.console.appendChild(div);
+  },
+
+  _vaLigne(lig) {
+    const lignes = this.editeur.value.split("\n");
+    let pos = 0;
+    for (let i = 0; i < lig - 1 && i < lignes.length; i++) pos += lignes[i].length + 1;
+    const fin = pos + (lignes[lig - 1] || "").length;
+    this.editeur.focus();
+    this.editeur.setSelectionRange(pos, fin);
+    const lh = parseFloat(getComputedStyle(this.editeur).lineHeight) || 18;
+    this.editeur.scrollTop = Math.max(0, (lig - 1) * lh - this.editeur.clientHeight / 2);
+  },
+
+  _selectionne(nom) {
+    if (nom && this.modele && this.modele.masses.has(nom)) {
+      const ms = this.modele.masses.get(nom);
+      this.statut.textContent = `selection : @${nom}  (${ms.genre})  ` +
+        `pos [${ms.x.toFixed(2)} ${ms.y.toFixed(2)} ${ms.z.toFixed(2)}]`;
+    } else {
+      this.statut.textContent = this.modele ? statsModele(this.modele) : "pret";
+    }
+  },
+
+  /* ---------------- simulation ---------------- */
+
+  basculeSim() {
+    if (this.simActive) { this._stopSim(); return; }
+    if (!this.modele || this.modele.erreurs.length || !this.modele.masses.size) {
+      this.statut.textContent = "corrige les erreurs avant de simuler";
+      return;
+    }
+    if (this.sim === null) this.sim = new Simulateur(this.modele);
+    this.simActive = true;
+    $("btn-sim").textContent = "⏸ Pause";
+    this._timer = setInterval(() => this._tick(), 25);
+  },
+
+  _stopSim() {
+    this.simActive = false;
+    this.sim = null;
+    clearInterval(this._timer);
+    this._timer = null;
+    $("btn-sim").textContent = "⏵ Simuler";
+  },
+
+  resetSim() {
+    if (this.sim) { this.sim.reset(); this._afficheSim(); }
+  },
+
+  frapper() {
+    if (!this.simActive) this.basculeSim();
+    if (!this.sim) return;
+    let nom = this.vue.selection;
+    if (nom === null || (this.modele.masses.has(nom) && estFixe(this.modele.masses.get(nom)))) {
+      const mobiles = this.sim.noms.filter((n, i) => this.sim.mobile[i]);
+      if (!mobiles.length) return;
+      nom = mobiles.reduce((a, b) =>
+        this.modele.masses.get(b).z > this.modele.masses.get(a).z ? b : a);
+    }
+    this.sim.frapper(nom);
+  },
+
+  _tick() {
+    if (!this.simActive || this.sim === null) return;
+    const ok = this.sim.pas(parseInt($("sld-vitesse").value, 10));
+    if (!ok)
+      this.statut.textContent = "EXPLOSION numerique -> reset (baisse K ou monte Z)";
+    this._afficheSim();
+  },
+
+  _afficheSim() {
+    const amp = parseFloat($("sld-ampli").value);
+    const { z_init: zi, x } = this.sim;
+    const zs = new Float64Array(x.length);
+    for (let i = 0; i < x.length; i++) zs[i] = zi[i] + (x[i] - zi[i]) * amp;
+    this.vue.positionsDynamiques(this.sim.noms, zs);
+  },
+
+  /* ---------------- fichiers ---------------- */
+
+  nouveau() {
+    this._stopSim();
+    this.editeur.value = "# Nouveau modele MIMS\n\n";
+    this.fichierNom = null;
+    document.title = "MIMS Studio 0.1.0 — version navigateur";
+    this.compiler();
+  },
+
+  chargeTexte(contenu, nomFichier) {
+    this._stopSim();
+    this.editeur.value = contenu;
+    this.fichierNom = nomFichier;
+    document.title = `MIMS Studio 0.1.0 — ${nomFichier}`;
+    this.compiler();
+    this.vue.recadrer();
+  },
+
+  enregistrer() {
+    const nom = this.fichierNom || "modele.mdl";
+    const blob = new Blob([this.editeur.value], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nom.endsWith(".mdl") ? nom : nom + ".mdl";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    this.statut.textContent = `telecharge : ${a.download} (dossier Telechargements)`;
+  },
+
+  /* ---------------- dialogues ---------------- */
+
+  dialogueForme(nom) {
+    const [, desc, schema] = CATALOGUE[nom];
+    $("dlg-forme-titre").textContent = `Générer : ${nom}`;
+    $("dlg-forme-desc").textContent = desc;
+    const champs = $("dlg-forme-champs");
+    champs.innerHTML = "";
+    const entrees = {};
+    for (const [cle, [label, defaut, vmin, vmax]] of Object.entries(schema)) {
+      const div = document.createElement("div");
+      div.className = "champ";
+      const span = document.createElement("span");
+      span.textContent = label;
+      const inp = document.createElement("input");
+      inp.type = "number"; inp.min = vmin; inp.max = vmax; inp.value = defaut;
+      entrees[cle] = inp;
+      div.append(span, inp);
+      champs.appendChild(div);
+    }
+    const go = () => {
+      try {
+        const params = {};
+        for (const [k, inp] of Object.entries(entrees)) params[k] = Number(inp.value);
+        const [texte] = genere(nom, params);
+        this._stopSim();
+        this.editeur.value = texte;
+        this.fichierNom = `${nom}.mdl`;
+        this.compiler();
+        this.vue.recadrer();
+        $("dlg-forme").close();
+      } catch (exc) {
+        alert("Generation impossible : " + exc.message);
+      }
+    };
+    const btn = $("dlg-forme-go");
+    btn.replaceWith(btn.cloneNode(true));              // purge les anciens handlers
+    $("dlg-forme-go").addEventListener("click", go);
+    $("dlg-forme").showModal();
+  },
+
+  exempleForme(nom) {
+    const schema = CATALOGUE[nom][2];
+    const params = {};
+    for (const [cle, [, defaut]] of Object.entries(schema)) params[cle] = defaut;
+    const [texte] = genere(nom, params);
+    this._stopSim();
+    this.editeur.value = texte;
+    this.fichierNom = `${nom}.mdl`;
+    this.compiler();
+    this.vue.recadrer();
+  },
+
+  dialogueObj(nomFichier, texte) {
+    $("dlg-obj-nom").textContent = nomFichier;
+    const go = () => {
+      try {
+        const masses = parseInt($("obj-masses").value, 10) || 0;
+        const ressorts = parseInt($("obj-ressorts").value, 10) || 0;
+        const [modele, note] = formeObj(nomFichier, texte, masses, ressorts);
+        this._stopSim();
+        this.editeur.value = modele.script(note);
+        this.fichierNom = modele.nom + ".mdl";
+        this.compiler();
+        this.vue.recadrer();
+        $("dlg-obj").close();
+      } catch (exc) {
+        alert("Import impossible : " + exc.message);
+      }
+    };
+    const btn = $("dlg-obj-go");
+    btn.replaceWith(btn.cloneNode(true));
+    $("dlg-obj-go").addEventListener("click", go);
+    $("dlg-obj").showModal();
+  },
+};
+
+app.init();
+
+/* auto-test optionnel : ouvrir avec #selftest dans l'URL */
+if (location.hash === "#selftest") {
+  setTimeout(() => {
+    const rapport = ["compile: " + app.statut.textContent];
+    app.basculeSim();
+    if (app.sim) {
+      app.sim.frapper(app.sim.noms[3]);
+      app.sim.pas(2000);
+      rapport.push(`simulation 2000 pas ok, amplitude ${app.sim.amplitude().toFixed(4)}`);
+    }
+    app._stopSim();
+    rapport.push("SELFTEST OK");
+    console.log(rapport.join("\n"));
+    window._selftest = rapport.join("\n");
+  }, 400);
+}
+</script>
+</body>
+</html>
