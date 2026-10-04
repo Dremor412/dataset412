@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>mi-gen Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/*@@STYLE@@*/
+</style>
+</head>
+<body>
+
+<div id="menubar">
+  <div class="menu" id="menu-fichier">
+    <button>Fichier</button>
+    <div class="menu-liste">
+      <button data-action="ouvrir">Ouvrir un .mdl…  (Ctrl/Cmd+O)</button>
+      <button data-action="enregistrer">Enregistrer le .mdl  (Ctrl/Cmd+S)</button>
+      <hr>
+      <button data-action="import3d">Importer un objet 3D (.obj / .stl)…</button>
+      <hr>
+      <button data-action="export">Exporter pour Max (.gendsp)…</button>
+    </div>
+  </div>
+  <div class="menu" id="menu-aide">
+    <button>Aide</button>
+    <div class="menu-liste">
+      <button data-action="aide">Prise en main et raccourcis</button>
+      <button data-action="budget">Re-mesurer la machine</button>
+    </div>
+  </div>
+  <span id="titre-app">mi-gen Studio 0.2</span>
+</div>
+
+<div id="main">
+  <div id="gauche">
+    <nav id="onglets">
+      <button data-onglet="construire" class="actif">Construire</button>
+      <button data-onglet="reglages">Réglages</button>
+      <button data-onglet="script">Script</button>
+      <button data-onglet="export">Export Max</button>
+    </nav>
+
+    <section id="p-construire" class="panneau actif">
+      <h4>Modèles prêts à jouer</h4>
+      <div id="liste-modeles" class="cartes"></div>
+
+      <h4>Formes 3D</h4>
+      <div id="liste-formes" class="puces"></div>
+
+      <h4>Objet 3D à toi</h4>
+      <button class="btn large" data-action="import3d">Importer un .obj / .stl…</button>
+      <p class="aide">Simplifié automatiquement pour tenir dans le budget de calcul de ta machine.</p>
+
+      <h4>Ajouter au modèle</h4>
+      <div id="liste-briques" class="puces"></div>
+      <p class="aide">Ensuite, clique un point dans la vue 3D pour l'<b>exciter</b>, l'<b>écouter</b>
+        ou le <b>relier</b> à un autre (Maj+clic sur un 2e point).</p>
+      <button class="btn" id="btn-vide">Repartir de zéro</button>
+    </section>
+
+    <section id="p-reglages" class="panneau">
+      <div id="zone-archet" hidden>
+        <h4>Archet</h4>
+        <div class="reglage">
+          <label for="sld-archet">vitesse</label>
+          <input type="range" id="sld-archet" min="-1" max="1" step="0.01" value="0">
+          <span id="val-archet">0</span>
+        </div>
+      </div>
+      <div id="liste-reglages"></div>
+      <p class="aide">Les curseurs agissent pendant que ça joue. Les valeurs sont recopiées dans le script.</p>
+    </section>
+
+    <section id="p-script" class="panneau">
+      <div class="outils">
+        <button class="btn" id="btn-compiler">Compiler (F5)</button>
+        <label class="case"><input type="checkbox" id="chk-auto" checked> auto</label>
+        <span id="stats-script" class="discret"></span>
+      </div>
+      <textarea id="editeur" spellcheck="false" wrap="off"></textarea>
+      <div id="label-problemes">Problèmes (clic = aller à la ligne) :</div>
+      <div id="console"></div>
+    </section>
+
+    <section id="p-export" class="panneau">
+      <p>Le modèle est converti en script <b>MIMS4Max</b>, puis traduit en code <b>gen~</b>
+        par le générateur officiel de mi-gen (inclus dans cette page).</p>
+      <div class="outils">
+        <button class="btn" id="btn-gendsp">Télécharger le .gendsp</button>
+        <button class="btn" id="btn-mdl-max">Télécharger le .mdl (MIMS4Max)</button>
+        <button class="btn" id="btn-copier-gen">Copier le code gen~</button>
+      </div>
+      <label class="case"><input type="checkbox" id="chk-invariant" checked>
+        indépendant de la fréquence d'échantillonnage (comme MIMS4Max)</label>
+      <div id="export-infos"></div>
+      <textarea id="export-code" readonly spellcheck="false" wrap="off"></textarea>
+      <details>
+        <summary>Utiliser dans Max</summary>
+        <ol>
+          <li>Installe le package <b>mi-gen</b> dans le dossier Packages de Max
+            (github.com/mi-creative/mi-gen) : il fournit migen-lib, migen-integrated et migen-proxies.</li>
+          <li>Range le .gendsp à côté de ton patch, puis crée un objet <code>[gen~ @gen nom]</code>
+            (nom du fichier sans extension) relié à un <code>[dac~]</code>.</li>
+          <li>Entrées <code>in1</code>… : position (posInput), force (frcInput) ou audioParam,
+            dans l'ordre affiché ci-dessus. Sorties <code>out1</code>… = tes sorties ; la dernière
+            donne le nombre de masses (pour l'affichage).</li>
+        </ol>
+      </details>
+    </section>
+  </div>
+
+  <div id="droite">
+    <div id="zone-canvas">
+      <canvas id="vue3d"></canvas>
+      <div id="inspecteur" hidden>
+        <div id="insp-titre"></div>
+        <div id="insp-sous" class="discret"></div>
+        <div id="insp-actions"></div>
+      </div>
+      <div id="legende">
+        <span><i class="pt" style="background:#5aa9e6"></i>masse</span>
+        <span><i class="pt carre" style="background:#e05555"></i>fixe</span>
+        <span><i class="pt" style="background:#f4d03f"></i>entrée (à attraper)</span>
+        <span><i class="pt losange"></i>proxy</span>
+        <span><i class="pt anneau"></i>écoute</span>
+      </div>
+    </div>
+    <div id="simbar">
+      <button class="btn" id="btn-anim" title="Animer la simulation (sans son)">▶ Animer</button>
+      <button class="btn" id="btn-son" title="Son temps réel : un pas de calcul par échantillon audio">🔈 Son</button>
+      <button class="btn" id="btn-frapper" title="Frapper (espace)">⚡ Frapper</button>
+      <button class="btn" id="btn-reset">⟲</button>
+      <label>force <input type="range" id="sld-force" min="0.01" max="1" step="0.01" value="0.3"></label>
+      <label>volume <input type="range" id="sld-volume" min="-30" max="30" step="1" value="0"></label>
+      <label title="ramène automatiquement le niveau vers un volume confortable"><input type="checkbox" id="chk-autovol" checked> auto</label>
+      <label>ampli. vue <input type="range" id="sld-ampli" min="1" max="200" step="1" value="20"></label>
+      <label id="lbl-vitesse">vitesse <input type="range" id="sld-vitesse" min="30" max="1500" value="400"></label>
+    </div>
+    <div id="statut">
+      <span id="statut-texte">prêt</span>
+      <span id="jauge" title="Charge de calcul du son sur un coeur de ta machine"><span id="jauge-barre"></span></span>
+      <span id="jauge-texte"></span>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg-form">
+  <h3 id="dlg-form-titre"></h3>
+  <div class="desc" id="dlg-form-desc"></div>
+  <div id="dlg-form-champs"></div>
+  <div class="actions">
+    <button class="btn" id="dlg-form-go">Ajouter</button>
+    <button class="btn" data-fermer>Annuler</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-import">
+  <h3 id="imp-nom">Importer un objet 3D</h3>
+  <div class="desc" id="imp-origine"></div>
+  <div class="champ"><span>masses</span>
+    <input type="range" id="imp-masses" min="20" max="1000" value="300">
+    <input type="number" id="imp-masses-n" min="20" max="5000" value="300"></div>
+  <div class="champ"><span>ressorts max (0 = tous)</span>
+    <input type="number" id="imp-ressorts" min="0" max="20000" value="0"></div>
+  <div class="champ"><span>points fixes</span>
+    <select id="imp-fixation">
+      <option value="bas">la base (posé au sol)</option>
+      <option value="haut">le sommet (suspendu)</option>
+      <option value="aucun">aucun (objet libre)</option>
+    </select></div>
+  <div class="champ"><span>axe vertical du fichier</span>
+    <select id="imp-orientation">
+      <option value="auto">deviner</option><option value="y">Y (Blender, la plupart)</option><option value="z">Z</option>
+    </select></div>
+  <div class="champ"><span>taille dans la scène</span>
+    <input type="number" id="imp-taille" min="2" max="60" value="16"></div>
+  <label class="case"><input type="checkbox" id="imp-relier" checked> relier les morceaux séparés</label>
+  <div id="imp-apercu" class="apercu"></div>
+  <div class="actions">
+    <button class="btn" id="imp-go">Importer</button>
+    <button class="btn" data-fermer>Annuler</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-aide">
+  <h3>mi-gen Studio — prise en main</h3>
+  <pre>CONSTRUIRE
+  Choisis un modèle prêt à jouer, une forme 3D, ou importe un .obj / .stl.
+  Ajoute des cordes, membranes, oscillateurs... (structures intégrées mi-gen).
+  Clique un point dans la vue : l'inspecteur propose Frapper, Pincer,
+  Frotter, Coup de force, Écouter, Supprimer. Maj+clic sur un 2e point :
+  Relier. Sur une corde ou une membrane, le point devient un proxy dont
+  la position se règle ensuite avec un curseur.
+
+JOUER
+  🔈 Son : son temps réel (1 pas de calcul = 1 échantillon, comme gen~).
+  ⚡ Frapper ou barre espace : coup sur les entrées de force, sinon
+     impulsion sur le point sélectionné (ou le plus haut).
+  Bille jaune : attrape-la et glisse verticalement (frapper, pincer...).
+  Réglages : tous les @param en curseurs, actifs pendant le jeu.
+  ▶ Animer : simulation visuelle sans son (curseur vitesse).
+
+VUE 3D
+  glisser : orbiter      molette : zoom      clic droit : déplacer
+  double-clic : recadrer clic : sélectionner Maj+clic : 2e point
+
+BUDGET
+  La jauge en bas indique la charge du son sur un coeur de ta machine
+  (mesurée au démarrage). Au-delà de 100 % le son décroche : l'import 3D
+  vise automatiquement ~50 %.
+
+MAX
+  Onglet Export Max : .gendsp prêt pour [gen~], ou .mdl pour MIMS4Max.
+  Les fichiers .mdl de mi-gen s'ouvrent ici tels quels.</pre>
+  <div class="actions"><button class="btn" data-fermer>Fermer</button></div>
+</dialog>
+
+<input type="file" id="fichier-mdl" accept=".mdl,.txt,text/plain" hidden>
+<input type="file" id="fichier-3d" accept=".obj,.stl" hidden>
+
+<script>
+//@@VENDOR@@
+</script>
+<script>
+//@@SCRIPTS@@
+</script>
+</body>
+</html>

@@ -1,21 +1,16 @@
-MIMS Studio — version navigateur (aucune installation)
-=======================================================
+mi-gen Studio — version navigateur (aucune installation)
+=========================================================
 
-1. Double-clique sur le fichier zip pour le decompresser
-   (macOS le fait tout seul, un dossier apparait a cote).
-
-2. Double-clique sur MIMS_Studio.html : il s'ouvre dans
-   Safari (ou Chrome). C'est tout — rien a installer,
-   tout tourne en local dans la page, aucune connexion requise.
+Double-clique sur MIMS_Studio.html : il s'ouvre dans Safari (ou Chrome).
+Tout tourne en local dans la page, aucune connexion requise.
 
 Prise en main rapide :
-  - glisser gauche = orbiter, molette = zoom, glisser droit = deplacer
-  - clic sur une bille = selectionner, puis bouton "Frapper"
-  - bouton "Simuler" = lancer la physique
-  - menu "Generer" = 13 formes pretes (cloche, sphere, arbre...)
-  - menu "Importer" = convertir un modele 3D .obj
-  - "Enregistrer" telecharge le .mdl dans le dossier Telechargements
+  - onglet Construire : modèles prêts à jouer, formes 3D, import .obj/.stl
+  - bouton "Son" puis barre espace = frapper
+  - clic sur un point de la vue 3D = inspecteur (frapper, pincer, écouter...)
+  - onglet Réglages = tous les paramètres en curseurs
+  - onglet Export Max = fichier .gendsp pour [gen~]
 
 Si Safari affiche le code au lieu de l'application : le fichier a
-peut-etre ete renomme en .txt pendant le transfert — remets
+peut-être été renommé en .txt pendant le transfert — remets
 l'extension .html et rouvre-le.

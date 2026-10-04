@@ -1,0 +1,627 @@
+# MIMS script genere par forme2mims (MIMS Studio) — objet 3D : cloche
+# cloche a profil evase, couronne fixee, bouche libre — laisse-la resonner
+# L'objet touche le sol (base z=0, pieds ground).
+# Attrape la bille jaune (posInput) et descends-la sur l'objet.
+
+@cloche_M param 1
+@cloche_K param 0.1
+@cloche_Z param 0.00005
+@cloche_Zo param 0.002
+
+@cloche_m0 osc cloche_M 0 cloche_Zo [7.00 0.00 0.50] 0
+@cloche_m1 osc cloche_M 0 cloche_Zo [6.47 2.68 0.50] 0
+@cloche_m2 osc cloche_M 0 cloche_Zo [4.95 4.95 0.50] 0
+@cloche_m3 osc cloche_M 0 cloche_Zo [2.68 6.47 0.50] 0
+@cloche_m4 osc cloche_M 0 cloche_Zo [0.00 7.00 0.50] 0
+@cloche_m5 osc cloche_M 0 cloche_Zo [-2.68 6.47 0.50] 0
+@cloche_m6 osc cloche_M 0 cloche_Zo [-4.95 4.95 0.50] 0
+@cloche_m7 osc cloche_M 0 cloche_Zo [-6.47 2.68 0.50] 0
+@cloche_m8 osc cloche_M 0 cloche_Zo [-7.00 0.00 0.50] 0
+@cloche_m9 osc cloche_M 0 cloche_Zo [-6.47 -2.68 0.50] 0
+@cloche_m10 osc cloche_M 0 cloche_Zo [-4.95 -4.95 0.50] 0
+@cloche_m11 osc cloche_M 0 cloche_Zo [-2.68 -6.47 0.50] 0
+@cloche_m12 osc cloche_M 0 cloche_Zo [-0.00 -7.00 0.50] 0
+@cloche_m13 osc cloche_M 0 cloche_Zo [2.68 -6.47 0.50] 0
+@cloche_m14 osc cloche_M 0 cloche_Zo [4.95 -4.95 0.50] 0
+@cloche_m15 osc cloche_M 0 cloche_Zo [6.47 -2.68 0.50] 0
+@cloche_m16 osc cloche_M 0 cloche_Zo [6.20 0.00 2.00] 0
+@cloche_m17 osc cloche_M 0 cloche_Zo [5.73 2.37 2.00] 0
+@cloche_m18 osc cloche_M 0 cloche_Zo [4.38 4.38 2.00] 0
+@cloche_m19 osc cloche_M 0 cloche_Zo [2.37 5.73 2.00] 0
+@cloche_m20 osc cloche_M 0 cloche_Zo [0.00 6.20 2.00] 0
+@cloche_m21 osc cloche_M 0 cloche_Zo [-2.37 5.73 2.00] 0
+@cloche_m22 osc cloche_M 0 cloche_Zo [-4.38 4.38 2.00] 0
+@cloche_m23 osc cloche_M 0 cloche_Zo [-5.73 2.37 2.00] 0
+@cloche_m24 osc cloche_M 0 cloche_Zo [-6.20 0.00 2.00] 0
+@cloche_m25 osc cloche_M 0 cloche_Zo [-5.73 -2.37 2.00] 0
+@cloche_m26 osc cloche_M 0 cloche_Zo [-4.38 -4.38 2.00] 0
+@cloche_m27 osc cloche_M 0 cloche_Zo [-2.37 -5.73 2.00] 0
+@cloche_m28 osc cloche_M 0 cloche_Zo [-0.00 -6.20 2.00] 0
+@cloche_m29 osc cloche_M 0 cloche_Zo [2.37 -5.73 2.00] 0
+@cloche_m30 osc cloche_M 0 cloche_Zo [4.38 -4.38 2.00] 0
+@cloche_m31 osc cloche_M 0 cloche_Zo [5.73 -2.37 2.00] 0
+@cloche_m32 osc cloche_M 0 cloche_Zo [5.47 0.00 3.50] 0
+@cloche_m33 osc cloche_M 0 cloche_Zo [5.06 2.09 3.50] 0
+@cloche_m34 osc cloche_M 0 cloche_Zo [3.87 3.87 3.50] 0
+@cloche_m35 osc cloche_M 0 cloche_Zo [2.09 5.06 3.50] 0
+@cloche_m36 osc cloche_M 0 cloche_Zo [0.00 5.47 3.50] 0
+@cloche_m37 osc cloche_M 0 cloche_Zo [-2.09 5.06 3.50] 0
+@cloche_m38 osc cloche_M 0 cloche_Zo [-3.87 3.87 3.50] 0
+@cloche_m39 osc cloche_M 0 cloche_Zo [-5.06 2.09 3.50] 0
+@cloche_m40 osc cloche_M 0 cloche_Zo [-5.47 0.00 3.50] 0
+@cloche_m41 osc cloche_M 0 cloche_Zo [-5.06 -2.09 3.50] 0
+@cloche_m42 osc cloche_M 0 cloche_Zo [-3.87 -3.87 3.50] 0
+@cloche_m43 osc cloche_M 0 cloche_Zo [-2.09 -5.06 3.50] 0
+@cloche_m44 osc cloche_M 0 cloche_Zo [-0.00 -5.47 3.50] 0
+@cloche_m45 osc cloche_M 0 cloche_Zo [2.09 -5.06 3.50] 0
+@cloche_m46 osc cloche_M 0 cloche_Zo [3.87 -3.87 3.50] 0
+@cloche_m47 osc cloche_M 0 cloche_Zo [5.06 -2.09 3.50] 0
+@cloche_m48 osc cloche_M 0 cloche_Zo [4.82 0.00 5.00] 0
+@cloche_m49 osc cloche_M 0 cloche_Zo [4.46 1.85 5.00] 0
+@cloche_m50 osc cloche_M 0 cloche_Zo [3.41 3.41 5.00] 0
+@cloche_m51 osc cloche_M 0 cloche_Zo [1.85 4.46 5.00] 0
+@cloche_m52 osc cloche_M 0 cloche_Zo [0.00 4.82 5.00] 0
+@cloche_m53 osc cloche_M 0 cloche_Zo [-1.85 4.46 5.00] 0
+@cloche_m54 osc cloche_M 0 cloche_Zo [-3.41 3.41 5.00] 0
+@cloche_m55 osc cloche_M 0 cloche_Zo [-4.46 1.85 5.00] 0
+@cloche_m56 osc cloche_M 0 cloche_Zo [-4.82 0.00 5.00] 0
+@cloche_m57 osc cloche_M 0 cloche_Zo [-4.46 -1.85 5.00] 0
+@cloche_m58 osc cloche_M 0 cloche_Zo [-3.41 -3.41 5.00] 0
+@cloche_m59 osc cloche_M 0 cloche_Zo [-1.85 -4.46 5.00] 0
+@cloche_m60 osc cloche_M 0 cloche_Zo [-0.00 -4.82 5.00] 0
+@cloche_m61 osc cloche_M 0 cloche_Zo [1.85 -4.46 5.00] 0
+@cloche_m62 osc cloche_M 0 cloche_Zo [3.41 -3.41 5.00] 0
+@cloche_m63 osc cloche_M 0 cloche_Zo [4.46 -1.85 5.00] 0
+@cloche_m64 osc cloche_M 0 cloche_Zo [4.26 0.00 6.50] 0
+@cloche_m65 osc cloche_M 0 cloche_Zo [3.93 1.63 6.50] 0
+@cloche_m66 osc cloche_M 0 cloche_Zo [3.01 3.01 6.50] 0
+@cloche_m67 osc cloche_M 0 cloche_Zo [1.63 3.93 6.50] 0
+@cloche_m68 osc cloche_M 0 cloche_Zo [0.00 4.26 6.50] 0
+@cloche_m69 osc cloche_M 0 cloche_Zo [-1.63 3.93 6.50] 0
+@cloche_m70 osc cloche_M 0 cloche_Zo [-3.01 3.01 6.50] 0
+@cloche_m71 osc cloche_M 0 cloche_Zo [-3.93 1.63 6.50] 0
+@cloche_m72 osc cloche_M 0 cloche_Zo [-4.26 0.00 6.50] 0
+@cloche_m73 osc cloche_M 0 cloche_Zo [-3.93 -1.63 6.50] 0
+@cloche_m74 osc cloche_M 0 cloche_Zo [-3.01 -3.01 6.50] 0
+@cloche_m75 osc cloche_M 0 cloche_Zo [-1.63 -3.93 6.50] 0
+@cloche_m76 osc cloche_M 0 cloche_Zo [-0.00 -4.26 6.50] 0
+@cloche_m77 osc cloche_M 0 cloche_Zo [1.63 -3.93 6.50] 0
+@cloche_m78 osc cloche_M 0 cloche_Zo [3.01 -3.01 6.50] 0
+@cloche_m79 osc cloche_M 0 cloche_Zo [3.93 -1.63 6.50] 0
+@cloche_m80 osc cloche_M 0 cloche_Zo [3.78 0.00 8.00] 0
+@cloche_m81 osc cloche_M 0 cloche_Zo [3.49 1.44 8.00] 0
+@cloche_m82 osc cloche_M 0 cloche_Zo [2.67 2.67 8.00] 0
+@cloche_m83 osc cloche_M 0 cloche_Zo [1.44 3.49 8.00] 0
+@cloche_m84 osc cloche_M 0 cloche_Zo [0.00 3.78 8.00] 0
+@cloche_m85 osc cloche_M 0 cloche_Zo [-1.44 3.49 8.00] 0
+@cloche_m86 osc cloche_M 0 cloche_Zo [-2.67 2.67 8.00] 0
+@cloche_m87 osc cloche_M 0 cloche_Zo [-3.49 1.44 8.00] 0
+@cloche_m88 osc cloche_M 0 cloche_Zo [-3.78 0.00 8.00] 0
+@cloche_m89 osc cloche_M 0 cloche_Zo [-3.49 -1.44 8.00] 0
+@cloche_m90 osc cloche_M 0 cloche_Zo [-2.67 -2.67 8.00] 0
+@cloche_m91 osc cloche_M 0 cloche_Zo [-1.44 -3.49 8.00] 0
+@cloche_m92 osc cloche_M 0 cloche_Zo [-0.00 -3.78 8.00] 0
+@cloche_m93 osc cloche_M 0 cloche_Zo [1.44 -3.49 8.00] 0
+@cloche_m94 osc cloche_M 0 cloche_Zo [2.67 -2.67 8.00] 0
+@cloche_m95 osc cloche_M 0 cloche_Zo [3.49 -1.44 8.00] 0
+@cloche_m96 osc cloche_M 0 cloche_Zo [3.38 0.00 9.50] 0
+@cloche_m97 osc cloche_M 0 cloche_Zo [3.12 1.29 9.50] 0
+@cloche_m98 osc cloche_M 0 cloche_Zo [2.39 2.39 9.50] 0
+@cloche_m99 osc cloche_M 0 cloche_Zo [1.29 3.12 9.50] 0
+@cloche_m100 osc cloche_M 0 cloche_Zo [0.00 3.38 9.50] 0
+@cloche_m101 osc cloche_M 0 cloche_Zo [-1.29 3.12 9.50] 0
+@cloche_m102 osc cloche_M 0 cloche_Zo [-2.39 2.39 9.50] 0
+@cloche_m103 osc cloche_M 0 cloche_Zo [-3.12 1.29 9.50] 0
+@cloche_m104 osc cloche_M 0 cloche_Zo [-3.38 0.00 9.50] 0
+@cloche_m105 osc cloche_M 0 cloche_Zo [-3.12 -1.29 9.50] 0
+@cloche_m106 osc cloche_M 0 cloche_Zo [-2.39 -2.39 9.50] 0
+@cloche_m107 osc cloche_M 0 cloche_Zo [-1.29 -3.12 9.50] 0
+@cloche_m108 osc cloche_M 0 cloche_Zo [-0.00 -3.38 9.50] 0
+@cloche_m109 osc cloche_M 0 cloche_Zo [1.29 -3.12 9.50] 0
+@cloche_m110 osc cloche_M 0 cloche_Zo [2.39 -2.39 9.50] 0
+@cloche_m111 osc cloche_M 0 cloche_Zo [3.12 -1.29 9.50] 0
+@cloche_m112 osc cloche_M 0 cloche_Zo [3.08 0.00 11.00] 0
+@cloche_m113 osc cloche_M 0 cloche_Zo [2.85 1.18 11.00] 0
+@cloche_m114 osc cloche_M 0 cloche_Zo [2.18 2.18 11.00] 0
+@cloche_m115 osc cloche_M 0 cloche_Zo [1.18 2.85 11.00] 0
+@cloche_m116 osc cloche_M 0 cloche_Zo [0.00 3.08 11.00] 0
+@cloche_m117 osc cloche_M 0 cloche_Zo [-1.18 2.85 11.00] 0
+@cloche_m118 osc cloche_M 0 cloche_Zo [-2.18 2.18 11.00] 0
+@cloche_m119 osc cloche_M 0 cloche_Zo [-2.85 1.18 11.00] 0
+@cloche_m120 osc cloche_M 0 cloche_Zo [-3.08 0.00 11.00] 0
+@cloche_m121 osc cloche_M 0 cloche_Zo [-2.85 -1.18 11.00] 0
+@cloche_m122 osc cloche_M 0 cloche_Zo [-2.18 -2.18 11.00] 0
+@cloche_m123 osc cloche_M 0 cloche_Zo [-1.18 -2.85 11.00] 0
+@cloche_m124 osc cloche_M 0 cloche_Zo [-0.00 -3.08 11.00] 0
+@cloche_m125 osc cloche_M 0 cloche_Zo [1.18 -2.85 11.00] 0
+@cloche_m126 osc cloche_M 0 cloche_Zo [2.18 -2.18 11.00] 0
+@cloche_m127 osc cloche_M 0 cloche_Zo [2.85 -1.18 11.00] 0
+@cloche_m128 osc cloche_M 0 cloche_Zo [2.88 0.00 12.50] 0
+@cloche_m129 osc cloche_M 0 cloche_Zo [2.66 1.10 12.50] 0
+@cloche_m130 osc cloche_M 0 cloche_Zo [2.04 2.04 12.50] 0
+@cloche_m131 osc cloche_M 0 cloche_Zo [1.10 2.66 12.50] 0
+@cloche_m132 osc cloche_M 0 cloche_Zo [0.00 2.88 12.50] 0
+@cloche_m133 osc cloche_M 0 cloche_Zo [-1.10 2.66 12.50] 0
+@cloche_m134 osc cloche_M 0 cloche_Zo [-2.04 2.04 12.50] 0
+@cloche_m135 osc cloche_M 0 cloche_Zo [-2.66 1.10 12.50] 0
+@cloche_m136 osc cloche_M 0 cloche_Zo [-2.88 0.00 12.50] 0
+@cloche_m137 osc cloche_M 0 cloche_Zo [-2.66 -1.10 12.50] 0
+@cloche_m138 osc cloche_M 0 cloche_Zo [-2.04 -2.04 12.50] 0
+@cloche_m139 osc cloche_M 0 cloche_Zo [-1.10 -2.66 12.50] 0
+@cloche_m140 osc cloche_M 0 cloche_Zo [-0.00 -2.88 12.50] 0
+@cloche_m141 osc cloche_M 0 cloche_Zo [1.10 -2.66 12.50] 0
+@cloche_m142 osc cloche_M 0 cloche_Zo [2.04 -2.04 12.50] 0
+@cloche_m143 osc cloche_M 0 cloche_Zo [2.66 -1.10 12.50] 0
+@cloche_m144 ground [2.80 0.00 14.00]
+@cloche_m145 ground [2.59 1.07 14.00]
+@cloche_m146 ground [1.98 1.98 14.00]
+@cloche_m147 ground [1.07 2.59 14.00]
+@cloche_m148 ground [0.00 2.80 14.00]
+@cloche_m149 ground [-1.07 2.59 14.00]
+@cloche_m150 ground [-1.98 1.98 14.00]
+@cloche_m151 ground [-2.59 1.07 14.00]
+@cloche_m152 ground [-2.80 0.00 14.00]
+@cloche_m153 ground [-2.59 -1.07 14.00]
+@cloche_m154 ground [-1.98 -1.98 14.00]
+@cloche_m155 ground [-1.07 -2.59 14.00]
+@cloche_m156 ground [-0.00 -2.80 14.00]
+@cloche_m157 ground [1.07 -2.59 14.00]
+@cloche_m158 ground [1.98 -1.98 14.00]
+@cloche_m159 ground [2.59 -1.07 14.00]
+
+@cloche_r0 springDamper @cloche_m0 @cloche_m1 cloche_K cloche_Z
+@cloche_r1 springDamper @cloche_m0 @cloche_m15 cloche_K cloche_Z
+@cloche_r2 springDamper @cloche_m0 @cloche_m16 cloche_K cloche_Z
+@cloche_r3 springDamper @cloche_m0 @cloche_m17 cloche_K cloche_Z
+@cloche_r4 springDamper @cloche_m1 @cloche_m2 cloche_K cloche_Z
+@cloche_r5 springDamper @cloche_m1 @cloche_m17 cloche_K cloche_Z
+@cloche_r6 springDamper @cloche_m1 @cloche_m18 cloche_K cloche_Z
+@cloche_r7 springDamper @cloche_m2 @cloche_m3 cloche_K cloche_Z
+@cloche_r8 springDamper @cloche_m2 @cloche_m18 cloche_K cloche_Z
+@cloche_r9 springDamper @cloche_m2 @cloche_m19 cloche_K cloche_Z
+@cloche_r10 springDamper @cloche_m3 @cloche_m4 cloche_K cloche_Z
+@cloche_r11 springDamper @cloche_m3 @cloche_m19 cloche_K cloche_Z
+@cloche_r12 springDamper @cloche_m3 @cloche_m20 cloche_K cloche_Z
+@cloche_r13 springDamper @cloche_m4 @cloche_m5 cloche_K cloche_Z
+@cloche_r14 springDamper @cloche_m4 @cloche_m20 cloche_K cloche_Z
+@cloche_r15 springDamper @cloche_m4 @cloche_m21 cloche_K cloche_Z
+@cloche_r16 springDamper @cloche_m5 @cloche_m6 cloche_K cloche_Z
+@cloche_r17 springDamper @cloche_m5 @cloche_m21 cloche_K cloche_Z
+@cloche_r18 springDamper @cloche_m5 @cloche_m22 cloche_K cloche_Z
+@cloche_r19 springDamper @cloche_m6 @cloche_m7 cloche_K cloche_Z
+@cloche_r20 springDamper @cloche_m6 @cloche_m22 cloche_K cloche_Z
+@cloche_r21 springDamper @cloche_m6 @cloche_m23 cloche_K cloche_Z
+@cloche_r22 springDamper @cloche_m7 @cloche_m8 cloche_K cloche_Z
+@cloche_r23 springDamper @cloche_m7 @cloche_m23 cloche_K cloche_Z
+@cloche_r24 springDamper @cloche_m7 @cloche_m24 cloche_K cloche_Z
+@cloche_r25 springDamper @cloche_m8 @cloche_m9 cloche_K cloche_Z
+@cloche_r26 springDamper @cloche_m8 @cloche_m24 cloche_K cloche_Z
+@cloche_r27 springDamper @cloche_m8 @cloche_m25 cloche_K cloche_Z
+@cloche_r28 springDamper @cloche_m9 @cloche_m10 cloche_K cloche_Z
+@cloche_r29 springDamper @cloche_m9 @cloche_m25 cloche_K cloche_Z
+@cloche_r30 springDamper @cloche_m9 @cloche_m26 cloche_K cloche_Z
+@cloche_r31 springDamper @cloche_m10 @cloche_m11 cloche_K cloche_Z
+@cloche_r32 springDamper @cloche_m10 @cloche_m26 cloche_K cloche_Z
+@cloche_r33 springDamper @cloche_m10 @cloche_m27 cloche_K cloche_Z
+@cloche_r34 springDamper @cloche_m11 @cloche_m12 cloche_K cloche_Z
+@cloche_r35 springDamper @cloche_m11 @cloche_m27 cloche_K cloche_Z
+@cloche_r36 springDamper @cloche_m11 @cloche_m28 cloche_K cloche_Z
+@cloche_r37 springDamper @cloche_m12 @cloche_m13 cloche_K cloche_Z
+@cloche_r38 springDamper @cloche_m12 @cloche_m28 cloche_K cloche_Z
+@cloche_r39 springDamper @cloche_m12 @cloche_m29 cloche_K cloche_Z
+@cloche_r40 springDamper @cloche_m13 @cloche_m14 cloche_K cloche_Z
+@cloche_r41 springDamper @cloche_m13 @cloche_m29 cloche_K cloche_Z
+@cloche_r42 springDamper @cloche_m13 @cloche_m30 cloche_K cloche_Z
+@cloche_r43 springDamper @cloche_m14 @cloche_m15 cloche_K cloche_Z
+@cloche_r44 springDamper @cloche_m14 @cloche_m30 cloche_K cloche_Z
+@cloche_r45 springDamper @cloche_m14 @cloche_m31 cloche_K cloche_Z
+@cloche_r46 springDamper @cloche_m15 @cloche_m16 cloche_K cloche_Z
+@cloche_r47 springDamper @cloche_m15 @cloche_m31 cloche_K cloche_Z
+@cloche_r48 springDamper @cloche_m16 @cloche_m17 cloche_K cloche_Z
+@cloche_r49 springDamper @cloche_m16 @cloche_m31 cloche_K cloche_Z
+@cloche_r50 springDamper @cloche_m16 @cloche_m32 cloche_K cloche_Z
+@cloche_r51 springDamper @cloche_m16 @cloche_m33 cloche_K cloche_Z
+@cloche_r52 springDamper @cloche_m17 @cloche_m18 cloche_K cloche_Z
+@cloche_r53 springDamper @cloche_m17 @cloche_m33 cloche_K cloche_Z
+@cloche_r54 springDamper @cloche_m17 @cloche_m34 cloche_K cloche_Z
+@cloche_r55 springDamper @cloche_m18 @cloche_m19 cloche_K cloche_Z
+@cloche_r56 springDamper @cloche_m18 @cloche_m34 cloche_K cloche_Z
+@cloche_r57 springDamper @cloche_m18 @cloche_m35 cloche_K cloche_Z
+@cloche_r58 springDamper @cloche_m19 @cloche_m20 cloche_K cloche_Z
+@cloche_r59 springDamper @cloche_m19 @cloche_m35 cloche_K cloche_Z
+@cloche_r60 springDamper @cloche_m19 @cloche_m36 cloche_K cloche_Z
+@cloche_r61 springDamper @cloche_m20 @cloche_m21 cloche_K cloche_Z
+@cloche_r62 springDamper @cloche_m20 @cloche_m36 cloche_K cloche_Z
+@cloche_r63 springDamper @cloche_m20 @cloche_m37 cloche_K cloche_Z
+@cloche_r64 springDamper @cloche_m21 @cloche_m22 cloche_K cloche_Z
+@cloche_r65 springDamper @cloche_m21 @cloche_m37 cloche_K cloche_Z
+@cloche_r66 springDamper @cloche_m21 @cloche_m38 cloche_K cloche_Z
+@cloche_r67 springDamper @cloche_m22 @cloche_m23 cloche_K cloche_Z
+@cloche_r68 springDamper @cloche_m22 @cloche_m38 cloche_K cloche_Z
+@cloche_r69 springDamper @cloche_m22 @cloche_m39 cloche_K cloche_Z
+@cloche_r70 springDamper @cloche_m23 @cloche_m24 cloche_K cloche_Z
+@cloche_r71 springDamper @cloche_m23 @cloche_m39 cloche_K cloche_Z
+@cloche_r72 springDamper @cloche_m23 @cloche_m40 cloche_K cloche_Z
+@cloche_r73 springDamper @cloche_m24 @cloche_m25 cloche_K cloche_Z
+@cloche_r74 springDamper @cloche_m24 @cloche_m40 cloche_K cloche_Z
+@cloche_r75 springDamper @cloche_m24 @cloche_m41 cloche_K cloche_Z
+@cloche_r76 springDamper @cloche_m25 @cloche_m26 cloche_K cloche_Z
+@cloche_r77 springDamper @cloche_m25 @cloche_m41 cloche_K cloche_Z
+@cloche_r78 springDamper @cloche_m25 @cloche_m42 cloche_K cloche_Z
+@cloche_r79 springDamper @cloche_m26 @cloche_m27 cloche_K cloche_Z
+@cloche_r80 springDamper @cloche_m26 @cloche_m42 cloche_K cloche_Z
+@cloche_r81 springDamper @cloche_m26 @cloche_m43 cloche_K cloche_Z
+@cloche_r82 springDamper @cloche_m27 @cloche_m28 cloche_K cloche_Z
+@cloche_r83 springDamper @cloche_m27 @cloche_m43 cloche_K cloche_Z
+@cloche_r84 springDamper @cloche_m27 @cloche_m44 cloche_K cloche_Z
+@cloche_r85 springDamper @cloche_m28 @cloche_m29 cloche_K cloche_Z
+@cloche_r86 springDamper @cloche_m28 @cloche_m44 cloche_K cloche_Z
+@cloche_r87 springDamper @cloche_m28 @cloche_m45 cloche_K cloche_Z
+@cloche_r88 springDamper @cloche_m29 @cloche_m30 cloche_K cloche_Z
+@cloche_r89 springDamper @cloche_m29 @cloche_m45 cloche_K cloche_Z
+@cloche_r90 springDamper @cloche_m29 @cloche_m46 cloche_K cloche_Z
+@cloche_r91 springDamper @cloche_m30 @cloche_m31 cloche_K cloche_Z
+@cloche_r92 springDamper @cloche_m30 @cloche_m46 cloche_K cloche_Z
+@cloche_r93 springDamper @cloche_m30 @cloche_m47 cloche_K cloche_Z
+@cloche_r94 springDamper @cloche_m31 @cloche_m32 cloche_K cloche_Z
+@cloche_r95 springDamper @cloche_m31 @cloche_m47 cloche_K cloche_Z
+@cloche_r96 springDamper @cloche_m32 @cloche_m33 cloche_K cloche_Z
+@cloche_r97 springDamper @cloche_m32 @cloche_m47 cloche_K cloche_Z
+@cloche_r98 springDamper @cloche_m32 @cloche_m48 cloche_K cloche_Z
+@cloche_r99 springDamper @cloche_m32 @cloche_m49 cloche_K cloche_Z
+@cloche_r100 springDamper @cloche_m33 @cloche_m34 cloche_K cloche_Z
+@cloche_r101 springDamper @cloche_m33 @cloche_m49 cloche_K cloche_Z
+@cloche_r102 springDamper @cloche_m33 @cloche_m50 cloche_K cloche_Z
+@cloche_r103 springDamper @cloche_m34 @cloche_m35 cloche_K cloche_Z
+@cloche_r104 springDamper @cloche_m34 @cloche_m50 cloche_K cloche_Z
+@cloche_r105 springDamper @cloche_m34 @cloche_m51 cloche_K cloche_Z
+@cloche_r106 springDamper @cloche_m35 @cloche_m36 cloche_K cloche_Z
+@cloche_r107 springDamper @cloche_m35 @cloche_m51 cloche_K cloche_Z
+@cloche_r108 springDamper @cloche_m35 @cloche_m52 cloche_K cloche_Z
+@cloche_r109 springDamper @cloche_m36 @cloche_m37 cloche_K cloche_Z
+@cloche_r110 springDamper @cloche_m36 @cloche_m52 cloche_K cloche_Z
+@cloche_r111 springDamper @cloche_m36 @cloche_m53 cloche_K cloche_Z
+@cloche_r112 springDamper @cloche_m37 @cloche_m38 cloche_K cloche_Z
+@cloche_r113 springDamper @cloche_m37 @cloche_m53 cloche_K cloche_Z
+@cloche_r114 springDamper @cloche_m37 @cloche_m54 cloche_K cloche_Z
+@cloche_r115 springDamper @cloche_m38 @cloche_m39 cloche_K cloche_Z
+@cloche_r116 springDamper @cloche_m38 @cloche_m54 cloche_K cloche_Z
+@cloche_r117 springDamper @cloche_m38 @cloche_m55 cloche_K cloche_Z
+@cloche_r118 springDamper @cloche_m39 @cloche_m40 cloche_K cloche_Z
+@cloche_r119 springDamper @cloche_m39 @cloche_m55 cloche_K cloche_Z
+@cloche_r120 springDamper @cloche_m39 @cloche_m56 cloche_K cloche_Z
+@cloche_r121 springDamper @cloche_m40 @cloche_m41 cloche_K cloche_Z
+@cloche_r122 springDamper @cloche_m40 @cloche_m56 cloche_K cloche_Z
+@cloche_r123 springDamper @cloche_m40 @cloche_m57 cloche_K cloche_Z
+@cloche_r124 springDamper @cloche_m41 @cloche_m42 cloche_K cloche_Z
+@cloche_r125 springDamper @cloche_m41 @cloche_m57 cloche_K cloche_Z
+@cloche_r126 springDamper @cloche_m41 @cloche_m58 cloche_K cloche_Z
+@cloche_r127 springDamper @cloche_m42 @cloche_m43 cloche_K cloche_Z
+@cloche_r128 springDamper @cloche_m42 @cloche_m58 cloche_K cloche_Z
+@cloche_r129 springDamper @cloche_m42 @cloche_m59 cloche_K cloche_Z
+@cloche_r130 springDamper @cloche_m43 @cloche_m44 cloche_K cloche_Z
+@cloche_r131 springDamper @cloche_m43 @cloche_m59 cloche_K cloche_Z
+@cloche_r132 springDamper @cloche_m43 @cloche_m60 cloche_K cloche_Z
+@cloche_r133 springDamper @cloche_m44 @cloche_m45 cloche_K cloche_Z
+@cloche_r134 springDamper @cloche_m44 @cloche_m60 cloche_K cloche_Z
+@cloche_r135 springDamper @cloche_m44 @cloche_m61 cloche_K cloche_Z
+@cloche_r136 springDamper @cloche_m45 @cloche_m46 cloche_K cloche_Z
+@cloche_r137 springDamper @cloche_m45 @cloche_m61 cloche_K cloche_Z
+@cloche_r138 springDamper @cloche_m45 @cloche_m62 cloche_K cloche_Z
+@cloche_r139 springDamper @cloche_m46 @cloche_m47 cloche_K cloche_Z
+@cloche_r140 springDamper @cloche_m46 @cloche_m62 cloche_K cloche_Z
+@cloche_r141 springDamper @cloche_m46 @cloche_m63 cloche_K cloche_Z
+@cloche_r142 springDamper @cloche_m47 @cloche_m48 cloche_K cloche_Z
+@cloche_r143 springDamper @cloche_m47 @cloche_m63 cloche_K cloche_Z
+@cloche_r144 springDamper @cloche_m48 @cloche_m49 cloche_K cloche_Z
+@cloche_r145 springDamper @cloche_m48 @cloche_m63 cloche_K cloche_Z
+@cloche_r146 springDamper @cloche_m48 @cloche_m64 cloche_K cloche_Z
+@cloche_r147 springDamper @cloche_m48 @cloche_m65 cloche_K cloche_Z
+@cloche_r148 springDamper @cloche_m49 @cloche_m50 cloche_K cloche_Z
+@cloche_r149 springDamper @cloche_m49 @cloche_m65 cloche_K cloche_Z
+@cloche_r150 springDamper @cloche_m49 @cloche_m66 cloche_K cloche_Z
+@cloche_r151 springDamper @cloche_m50 @cloche_m51 cloche_K cloche_Z
+@cloche_r152 springDamper @cloche_m50 @cloche_m66 cloche_K cloche_Z
+@cloche_r153 springDamper @cloche_m50 @cloche_m67 cloche_K cloche_Z
+@cloche_r154 springDamper @cloche_m51 @cloche_m52 cloche_K cloche_Z
+@cloche_r155 springDamper @cloche_m51 @cloche_m67 cloche_K cloche_Z
+@cloche_r156 springDamper @cloche_m51 @cloche_m68 cloche_K cloche_Z
+@cloche_r157 springDamper @cloche_m52 @cloche_m53 cloche_K cloche_Z
+@cloche_r158 springDamper @cloche_m52 @cloche_m68 cloche_K cloche_Z
+@cloche_r159 springDamper @cloche_m52 @cloche_m69 cloche_K cloche_Z
+@cloche_r160 springDamper @cloche_m53 @cloche_m54 cloche_K cloche_Z
+@cloche_r161 springDamper @cloche_m53 @cloche_m69 cloche_K cloche_Z
+@cloche_r162 springDamper @cloche_m53 @cloche_m70 cloche_K cloche_Z
+@cloche_r163 springDamper @cloche_m54 @cloche_m55 cloche_K cloche_Z
+@cloche_r164 springDamper @cloche_m54 @cloche_m70 cloche_K cloche_Z
+@cloche_r165 springDamper @cloche_m54 @cloche_m71 cloche_K cloche_Z
+@cloche_r166 springDamper @cloche_m55 @cloche_m56 cloche_K cloche_Z
+@cloche_r167 springDamper @cloche_m55 @cloche_m71 cloche_K cloche_Z
+@cloche_r168 springDamper @cloche_m55 @cloche_m72 cloche_K cloche_Z
+@cloche_r169 springDamper @cloche_m56 @cloche_m57 cloche_K cloche_Z
+@cloche_r170 springDamper @cloche_m56 @cloche_m72 cloche_K cloche_Z
+@cloche_r171 springDamper @cloche_m56 @cloche_m73 cloche_K cloche_Z
+@cloche_r172 springDamper @cloche_m57 @cloche_m58 cloche_K cloche_Z
+@cloche_r173 springDamper @cloche_m57 @cloche_m73 cloche_K cloche_Z
+@cloche_r174 springDamper @cloche_m57 @cloche_m74 cloche_K cloche_Z
+@cloche_r175 springDamper @cloche_m58 @cloche_m59 cloche_K cloche_Z
+@cloche_r176 springDamper @cloche_m58 @cloche_m74 cloche_K cloche_Z
+@cloche_r177 springDamper @cloche_m58 @cloche_m75 cloche_K cloche_Z
+@cloche_r178 springDamper @cloche_m59 @cloche_m60 cloche_K cloche_Z
+@cloche_r179 springDamper @cloche_m59 @cloche_m75 cloche_K cloche_Z
+@cloche_r180 springDamper @cloche_m59 @cloche_m76 cloche_K cloche_Z
+@cloche_r181 springDamper @cloche_m60 @cloche_m61 cloche_K cloche_Z
+@cloche_r182 springDamper @cloche_m60 @cloche_m76 cloche_K cloche_Z
+@cloche_r183 springDamper @cloche_m60 @cloche_m77 cloche_K cloche_Z
+@cloche_r184 springDamper @cloche_m61 @cloche_m62 cloche_K cloche_Z
+@cloche_r185 springDamper @cloche_m61 @cloche_m77 cloche_K cloche_Z
+@cloche_r186 springDamper @cloche_m61 @cloche_m78 cloche_K cloche_Z
+@cloche_r187 springDamper @cloche_m62 @cloche_m63 cloche_K cloche_Z
+@cloche_r188 springDamper @cloche_m62 @cloche_m78 cloche_K cloche_Z
+@cloche_r189 springDamper @cloche_m62 @cloche_m79 cloche_K cloche_Z
+@cloche_r190 springDamper @cloche_m63 @cloche_m64 cloche_K cloche_Z
+@cloche_r191 springDamper @cloche_m63 @cloche_m79 cloche_K cloche_Z
+@cloche_r192 springDamper @cloche_m64 @cloche_m65 cloche_K cloche_Z
+@cloche_r193 springDamper @cloche_m64 @cloche_m79 cloche_K cloche_Z
+@cloche_r194 springDamper @cloche_m64 @cloche_m80 cloche_K cloche_Z
+@cloche_r195 springDamper @cloche_m64 @cloche_m81 cloche_K cloche_Z
+@cloche_r196 springDamper @cloche_m65 @cloche_m66 cloche_K cloche_Z
+@cloche_r197 springDamper @cloche_m65 @cloche_m81 cloche_K cloche_Z
+@cloche_r198 springDamper @cloche_m65 @cloche_m82 cloche_K cloche_Z
+@cloche_r199 springDamper @cloche_m66 @cloche_m67 cloche_K cloche_Z
+@cloche_r200 springDamper @cloche_m66 @cloche_m82 cloche_K cloche_Z
+@cloche_r201 springDamper @cloche_m66 @cloche_m83 cloche_K cloche_Z
+@cloche_r202 springDamper @cloche_m67 @cloche_m68 cloche_K cloche_Z
+@cloche_r203 springDamper @cloche_m67 @cloche_m83 cloche_K cloche_Z
+@cloche_r204 springDamper @cloche_m67 @cloche_m84 cloche_K cloche_Z
+@cloche_r205 springDamper @cloche_m68 @cloche_m69 cloche_K cloche_Z
+@cloche_r206 springDamper @cloche_m68 @cloche_m84 cloche_K cloche_Z
+@cloche_r207 springDamper @cloche_m68 @cloche_m85 cloche_K cloche_Z
+@cloche_r208 springDamper @cloche_m69 @cloche_m70 cloche_K cloche_Z
+@cloche_r209 springDamper @cloche_m69 @cloche_m85 cloche_K cloche_Z
+@cloche_r210 springDamper @cloche_m69 @cloche_m86 cloche_K cloche_Z
+@cloche_r211 springDamper @cloche_m70 @cloche_m71 cloche_K cloche_Z
+@cloche_r212 springDamper @cloche_m70 @cloche_m86 cloche_K cloche_Z
+@cloche_r213 springDamper @cloche_m70 @cloche_m87 cloche_K cloche_Z
+@cloche_r214 springDamper @cloche_m71 @cloche_m72 cloche_K cloche_Z
+@cloche_r215 springDamper @cloche_m71 @cloche_m87 cloche_K cloche_Z
+@cloche_r216 springDamper @cloche_m71 @cloche_m88 cloche_K cloche_Z
+@cloche_r217 springDamper @cloche_m72 @cloche_m73 cloche_K cloche_Z
+@cloche_r218 springDamper @cloche_m72 @cloche_m88 cloche_K cloche_Z
+@cloche_r219 springDamper @cloche_m72 @cloche_m89 cloche_K cloche_Z
+@cloche_r220 springDamper @cloche_m73 @cloche_m74 cloche_K cloche_Z
+@cloche_r221 springDamper @cloche_m73 @cloche_m89 cloche_K cloche_Z
+@cloche_r222 springDamper @cloche_m73 @cloche_m90 cloche_K cloche_Z
+@cloche_r223 springDamper @cloche_m74 @cloche_m75 cloche_K cloche_Z
+@cloche_r224 springDamper @cloche_m74 @cloche_m90 cloche_K cloche_Z
+@cloche_r225 springDamper @cloche_m74 @cloche_m91 cloche_K cloche_Z
+@cloche_r226 springDamper @cloche_m75 @cloche_m76 cloche_K cloche_Z
+@cloche_r227 springDamper @cloche_m75 @cloche_m91 cloche_K cloche_Z
+@cloche_r228 springDamper @cloche_m75 @cloche_m92 cloche_K cloche_Z
+@cloche_r229 springDamper @cloche_m76 @cloche_m77 cloche_K cloche_Z
+@cloche_r230 springDamper @cloche_m76 @cloche_m92 cloche_K cloche_Z
+@cloche_r231 springDamper @cloche_m76 @cloche_m93 cloche_K cloche_Z
+@cloche_r232 springDamper @cloche_m77 @cloche_m78 cloche_K cloche_Z
+@cloche_r233 springDamper @cloche_m77 @cloche_m93 cloche_K cloche_Z
+@cloche_r234 springDamper @cloche_m77 @cloche_m94 cloche_K cloche_Z
+@cloche_r235 springDamper @cloche_m78 @cloche_m79 cloche_K cloche_Z
+@cloche_r236 springDamper @cloche_m78 @cloche_m94 cloche_K cloche_Z
+@cloche_r237 springDamper @cloche_m78 @cloche_m95 cloche_K cloche_Z
+@cloche_r238 springDamper @cloche_m79 @cloche_m80 cloche_K cloche_Z
+@cloche_r239 springDamper @cloche_m79 @cloche_m95 cloche_K cloche_Z
+@cloche_r240 springDamper @cloche_m80 @cloche_m81 cloche_K cloche_Z
+@cloche_r241 springDamper @cloche_m80 @cloche_m95 cloche_K cloche_Z
+@cloche_r242 springDamper @cloche_m80 @cloche_m96 cloche_K cloche_Z
+@cloche_r243 springDamper @cloche_m80 @cloche_m97 cloche_K cloche_Z
+@cloche_r244 springDamper @cloche_m81 @cloche_m82 cloche_K cloche_Z
+@cloche_r245 springDamper @cloche_m81 @cloche_m97 cloche_K cloche_Z
+@cloche_r246 springDamper @cloche_m81 @cloche_m98 cloche_K cloche_Z
+@cloche_r247 springDamper @cloche_m82 @cloche_m83 cloche_K cloche_Z
+@cloche_r248 springDamper @cloche_m82 @cloche_m98 cloche_K cloche_Z
+@cloche_r249 springDamper @cloche_m82 @cloche_m99 cloche_K cloche_Z
+@cloche_r250 springDamper @cloche_m83 @cloche_m84 cloche_K cloche_Z
+@cloche_r251 springDamper @cloche_m83 @cloche_m99 cloche_K cloche_Z
+@cloche_r252 springDamper @cloche_m83 @cloche_m100 cloche_K cloche_Z
+@cloche_r253 springDamper @cloche_m84 @cloche_m85 cloche_K cloche_Z
+@cloche_r254 springDamper @cloche_m84 @cloche_m100 cloche_K cloche_Z
+@cloche_r255 springDamper @cloche_m84 @cloche_m101 cloche_K cloche_Z
+@cloche_r256 springDamper @cloche_m85 @cloche_m86 cloche_K cloche_Z
+@cloche_r257 springDamper @cloche_m85 @cloche_m101 cloche_K cloche_Z
+@cloche_r258 springDamper @cloche_m85 @cloche_m102 cloche_K cloche_Z
+@cloche_r259 springDamper @cloche_m86 @cloche_m87 cloche_K cloche_Z
+@cloche_r260 springDamper @cloche_m86 @cloche_m102 cloche_K cloche_Z
+@cloche_r261 springDamper @cloche_m86 @cloche_m103 cloche_K cloche_Z
+@cloche_r262 springDamper @cloche_m87 @cloche_m88 cloche_K cloche_Z
+@cloche_r263 springDamper @cloche_m87 @cloche_m103 cloche_K cloche_Z
+@cloche_r264 springDamper @cloche_m87 @cloche_m104 cloche_K cloche_Z
+@cloche_r265 springDamper @cloche_m88 @cloche_m89 cloche_K cloche_Z
+@cloche_r266 springDamper @cloche_m88 @cloche_m104 cloche_K cloche_Z
+@cloche_r267 springDamper @cloche_m88 @cloche_m105 cloche_K cloche_Z
+@cloche_r268 springDamper @cloche_m89 @cloche_m90 cloche_K cloche_Z
+@cloche_r269 springDamper @cloche_m89 @cloche_m105 cloche_K cloche_Z
+@cloche_r270 springDamper @cloche_m89 @cloche_m106 cloche_K cloche_Z
+@cloche_r271 springDamper @cloche_m90 @cloche_m91 cloche_K cloche_Z
+@cloche_r272 springDamper @cloche_m90 @cloche_m106 cloche_K cloche_Z
+@cloche_r273 springDamper @cloche_m90 @cloche_m107 cloche_K cloche_Z
+@cloche_r274 springDamper @cloche_m91 @cloche_m92 cloche_K cloche_Z
+@cloche_r275 springDamper @cloche_m91 @cloche_m107 cloche_K cloche_Z
+@cloche_r276 springDamper @cloche_m91 @cloche_m108 cloche_K cloche_Z
+@cloche_r277 springDamper @cloche_m92 @cloche_m93 cloche_K cloche_Z
+@cloche_r278 springDamper @cloche_m92 @cloche_m108 cloche_K cloche_Z
+@cloche_r279 springDamper @cloche_m92 @cloche_m109 cloche_K cloche_Z
+@cloche_r280 springDamper @cloche_m93 @cloche_m94 cloche_K cloche_Z
+@cloche_r281 springDamper @cloche_m93 @cloche_m109 cloche_K cloche_Z
+@cloche_r282 springDamper @cloche_m93 @cloche_m110 cloche_K cloche_Z
+@cloche_r283 springDamper @cloche_m94 @cloche_m95 cloche_K cloche_Z
+@cloche_r284 springDamper @cloche_m94 @cloche_m110 cloche_K cloche_Z
+@cloche_r285 springDamper @cloche_m94 @cloche_m111 cloche_K cloche_Z
+@cloche_r286 springDamper @cloche_m95 @cloche_m96 cloche_K cloche_Z
+@cloche_r287 springDamper @cloche_m95 @cloche_m111 cloche_K cloche_Z
+@cloche_r288 springDamper @cloche_m96 @cloche_m97 cloche_K cloche_Z
+@cloche_r289 springDamper @cloche_m96 @cloche_m111 cloche_K cloche_Z
+@cloche_r290 springDamper @cloche_m96 @cloche_m112 cloche_K cloche_Z
+@cloche_r291 springDamper @cloche_m96 @cloche_m113 cloche_K cloche_Z
+@cloche_r292 springDamper @cloche_m97 @cloche_m98 cloche_K cloche_Z
+@cloche_r293 springDamper @cloche_m97 @cloche_m113 cloche_K cloche_Z
+@cloche_r294 springDamper @cloche_m97 @cloche_m114 cloche_K cloche_Z
+@cloche_r295 springDamper @cloche_m98 @cloche_m99 cloche_K cloche_Z
+@cloche_r296 springDamper @cloche_m98 @cloche_m114 cloche_K cloche_Z
+@cloche_r297 springDamper @cloche_m98 @cloche_m115 cloche_K cloche_Z
+@cloche_r298 springDamper @cloche_m99 @cloche_m100 cloche_K cloche_Z
+@cloche_r299 springDamper @cloche_m99 @cloche_m115 cloche_K cloche_Z
+@cloche_r300 springDamper @cloche_m99 @cloche_m116 cloche_K cloche_Z
+@cloche_r301 springDamper @cloche_m100 @cloche_m101 cloche_K cloche_Z
+@cloche_r302 springDamper @cloche_m100 @cloche_m116 cloche_K cloche_Z
+@cloche_r303 springDamper @cloche_m100 @cloche_m117 cloche_K cloche_Z
+@cloche_r304 springDamper @cloche_m101 @cloche_m102 cloche_K cloche_Z
+@cloche_r305 springDamper @cloche_m101 @cloche_m117 cloche_K cloche_Z
+@cloche_r306 springDamper @cloche_m101 @cloche_m118 cloche_K cloche_Z
+@cloche_r307 springDamper @cloche_m102 @cloche_m103 cloche_K cloche_Z
+@cloche_r308 springDamper @cloche_m102 @cloche_m118 cloche_K cloche_Z
+@cloche_r309 springDamper @cloche_m102 @cloche_m119 cloche_K cloche_Z
+@cloche_r310 springDamper @cloche_m103 @cloche_m104 cloche_K cloche_Z
+@cloche_r311 springDamper @cloche_m103 @cloche_m119 cloche_K cloche_Z
+@cloche_r312 springDamper @cloche_m103 @cloche_m120 cloche_K cloche_Z
+@cloche_r313 springDamper @cloche_m104 @cloche_m105 cloche_K cloche_Z
+@cloche_r314 springDamper @cloche_m104 @cloche_m120 cloche_K cloche_Z
+@cloche_r315 springDamper @cloche_m104 @cloche_m121 cloche_K cloche_Z
+@cloche_r316 springDamper @cloche_m105 @cloche_m106 cloche_K cloche_Z
+@cloche_r317 springDamper @cloche_m105 @cloche_m121 cloche_K cloche_Z
+@cloche_r318 springDamper @cloche_m105 @cloche_m122 cloche_K cloche_Z
+@cloche_r319 springDamper @cloche_m106 @cloche_m107 cloche_K cloche_Z
+@cloche_r320 springDamper @cloche_m106 @cloche_m122 cloche_K cloche_Z
+@cloche_r321 springDamper @cloche_m106 @cloche_m123 cloche_K cloche_Z
+@cloche_r322 springDamper @cloche_m107 @cloche_m108 cloche_K cloche_Z
+@cloche_r323 springDamper @cloche_m107 @cloche_m123 cloche_K cloche_Z
+@cloche_r324 springDamper @cloche_m107 @cloche_m124 cloche_K cloche_Z
+@cloche_r325 springDamper @cloche_m108 @cloche_m109 cloche_K cloche_Z
+@cloche_r326 springDamper @cloche_m108 @cloche_m124 cloche_K cloche_Z
+@cloche_r327 springDamper @cloche_m108 @cloche_m125 cloche_K cloche_Z
+@cloche_r328 springDamper @cloche_m109 @cloche_m110 cloche_K cloche_Z
+@cloche_r329 springDamper @cloche_m109 @cloche_m125 cloche_K cloche_Z
+@cloche_r330 springDamper @cloche_m109 @cloche_m126 cloche_K cloche_Z
+@cloche_r331 springDamper @cloche_m110 @cloche_m111 cloche_K cloche_Z
+@cloche_r332 springDamper @cloche_m110 @cloche_m126 cloche_K cloche_Z
+@cloche_r333 springDamper @cloche_m110 @cloche_m127 cloche_K cloche_Z
+@cloche_r334 springDamper @cloche_m111 @cloche_m112 cloche_K cloche_Z
+@cloche_r335 springDamper @cloche_m111 @cloche_m127 cloche_K cloche_Z
+@cloche_r336 springDamper @cloche_m112 @cloche_m113 cloche_K cloche_Z
+@cloche_r337 springDamper @cloche_m112 @cloche_m127 cloche_K cloche_Z
+@cloche_r338 springDamper @cloche_m112 @cloche_m128 cloche_K cloche_Z
+@cloche_r339 springDamper @cloche_m112 @cloche_m129 cloche_K cloche_Z
+@cloche_r340 springDamper @cloche_m113 @cloche_m114 cloche_K cloche_Z
+@cloche_r341 springDamper @cloche_m113 @cloche_m129 cloche_K cloche_Z
+@cloche_r342 springDamper @cloche_m113 @cloche_m130 cloche_K cloche_Z
+@cloche_r343 springDamper @cloche_m114 @cloche_m115 cloche_K cloche_Z
+@cloche_r344 springDamper @cloche_m114 @cloche_m130 cloche_K cloche_Z
+@cloche_r345 springDamper @cloche_m114 @cloche_m131 cloche_K cloche_Z
+@cloche_r346 springDamper @cloche_m115 @cloche_m116 cloche_K cloche_Z
+@cloche_r347 springDamper @cloche_m115 @cloche_m131 cloche_K cloche_Z
+@cloche_r348 springDamper @cloche_m115 @cloche_m132 cloche_K cloche_Z
+@cloche_r349 springDamper @cloche_m116 @cloche_m117 cloche_K cloche_Z
+@cloche_r350 springDamper @cloche_m116 @cloche_m132 cloche_K cloche_Z
+@cloche_r351 springDamper @cloche_m116 @cloche_m133 cloche_K cloche_Z
+@cloche_r352 springDamper @cloche_m117 @cloche_m118 cloche_K cloche_Z
+@cloche_r353 springDamper @cloche_m117 @cloche_m133 cloche_K cloche_Z
+@cloche_r354 springDamper @cloche_m117 @cloche_m134 cloche_K cloche_Z
+@cloche_r355 springDamper @cloche_m118 @cloche_m119 cloche_K cloche_Z
+@cloche_r356 springDamper @cloche_m118 @cloche_m134 cloche_K cloche_Z
+@cloche_r357 springDamper @cloche_m118 @cloche_m135 cloche_K cloche_Z
+@cloche_r358 springDamper @cloche_m119 @cloche_m120 cloche_K cloche_Z
+@cloche_r359 springDamper @cloche_m119 @cloche_m135 cloche_K cloche_Z
+@cloche_r360 springDamper @cloche_m119 @cloche_m136 cloche_K cloche_Z
+@cloche_r361 springDamper @cloche_m120 @cloche_m121 cloche_K cloche_Z
+@cloche_r362 springDamper @cloche_m120 @cloche_m136 cloche_K cloche_Z
+@cloche_r363 springDamper @cloche_m120 @cloche_m137 cloche_K cloche_Z
+@cloche_r364 springDamper @cloche_m121 @cloche_m122 cloche_K cloche_Z
+@cloche_r365 springDamper @cloche_m121 @cloche_m137 cloche_K cloche_Z
+@cloche_r366 springDamper @cloche_m121 @cloche_m138 cloche_K cloche_Z
+@cloche_r367 springDamper @cloche_m122 @cloche_m123 cloche_K cloche_Z
+@cloche_r368 springDamper @cloche_m122 @cloche_m138 cloche_K cloche_Z
+@cloche_r369 springDamper @cloche_m122 @cloche_m139 cloche_K cloche_Z
+@cloche_r370 springDamper @cloche_m123 @cloche_m124 cloche_K cloche_Z
+@cloche_r371 springDamper @cloche_m123 @cloche_m139 cloche_K cloche_Z
+@cloche_r372 springDamper @cloche_m123 @cloche_m140 cloche_K cloche_Z
+@cloche_r373 springDamper @cloche_m124 @cloche_m125 cloche_K cloche_Z
+@cloche_r374 springDamper @cloche_m124 @cloche_m140 cloche_K cloche_Z
+@cloche_r375 springDamper @cloche_m124 @cloche_m141 cloche_K cloche_Z
+@cloche_r376 springDamper @cloche_m125 @cloche_m126 cloche_K cloche_Z
+@cloche_r377 springDamper @cloche_m125 @cloche_m141 cloche_K cloche_Z
+@cloche_r378 springDamper @cloche_m125 @cloche_m142 cloche_K cloche_Z
+@cloche_r379 springDamper @cloche_m126 @cloche_m127 cloche_K cloche_Z
+@cloche_r380 springDamper @cloche_m126 @cloche_m142 cloche_K cloche_Z
+@cloche_r381 springDamper @cloche_m126 @cloche_m143 cloche_K cloche_Z
+@cloche_r382 springDamper @cloche_m127 @cloche_m128 cloche_K cloche_Z
+@cloche_r383 springDamper @cloche_m127 @cloche_m143 cloche_K cloche_Z
+@cloche_r384 springDamper @cloche_m128 @cloche_m129 cloche_K cloche_Z
+@cloche_r385 springDamper @cloche_m128 @cloche_m143 cloche_K cloche_Z
+@cloche_r386 springDamper @cloche_m128 @cloche_m144 cloche_K cloche_Z
+@cloche_r387 springDamper @cloche_m128 @cloche_m145 cloche_K cloche_Z
+@cloche_r388 springDamper @cloche_m129 @cloche_m130 cloche_K cloche_Z
+@cloche_r389 springDamper @cloche_m129 @cloche_m145 cloche_K cloche_Z
+@cloche_r390 springDamper @cloche_m129 @cloche_m146 cloche_K cloche_Z
+@cloche_r391 springDamper @cloche_m130 @cloche_m131 cloche_K cloche_Z
+@cloche_r392 springDamper @cloche_m130 @cloche_m146 cloche_K cloche_Z
+@cloche_r393 springDamper @cloche_m130 @cloche_m147 cloche_K cloche_Z
+@cloche_r394 springDamper @cloche_m131 @cloche_m132 cloche_K cloche_Z
+@cloche_r395 springDamper @cloche_m131 @cloche_m147 cloche_K cloche_Z
+@cloche_r396 springDamper @cloche_m131 @cloche_m148 cloche_K cloche_Z
+@cloche_r397 springDamper @cloche_m132 @cloche_m133 cloche_K cloche_Z
+@cloche_r398 springDamper @cloche_m132 @cloche_m148 cloche_K cloche_Z
+@cloche_r399 springDamper @cloche_m132 @cloche_m149 cloche_K cloche_Z
+@cloche_r400 springDamper @cloche_m133 @cloche_m134 cloche_K cloche_Z
+@cloche_r401 springDamper @cloche_m133 @cloche_m149 cloche_K cloche_Z
+@cloche_r402 springDamper @cloche_m133 @cloche_m150 cloche_K cloche_Z
+@cloche_r403 springDamper @cloche_m134 @cloche_m135 cloche_K cloche_Z
+@cloche_r404 springDamper @cloche_m134 @cloche_m150 cloche_K cloche_Z
+@cloche_r405 springDamper @cloche_m134 @cloche_m151 cloche_K cloche_Z
+@cloche_r406 springDamper @cloche_m135 @cloche_m136 cloche_K cloche_Z
+@cloche_r407 springDamper @cloche_m135 @cloche_m151 cloche_K cloche_Z
+@cloche_r408 springDamper @cloche_m135 @cloche_m152 cloche_K cloche_Z
+@cloche_r409 springDamper @cloche_m136 @cloche_m137 cloche_K cloche_Z
+@cloche_r410 springDamper @cloche_m136 @cloche_m152 cloche_K cloche_Z
+@cloche_r411 springDamper @cloche_m136 @cloche_m153 cloche_K cloche_Z
+@cloche_r412 springDamper @cloche_m137 @cloche_m138 cloche_K cloche_Z
+@cloche_r413 springDamper @cloche_m137 @cloche_m153 cloche_K cloche_Z
+@cloche_r414 springDamper @cloche_m137 @cloche_m154 cloche_K cloche_Z
+@cloche_r415 springDamper @cloche_m138 @cloche_m139 cloche_K cloche_Z
+@cloche_r416 springDamper @cloche_m138 @cloche_m154 cloche_K cloche_Z
+@cloche_r417 springDamper @cloche_m138 @cloche_m155 cloche_K cloche_Z
+@cloche_r418 springDamper @cloche_m139 @cloche_m140 cloche_K cloche_Z
+@cloche_r419 springDamper @cloche_m139 @cloche_m155 cloche_K cloche_Z
+@cloche_r420 springDamper @cloche_m139 @cloche_m156 cloche_K cloche_Z
+@cloche_r421 springDamper @cloche_m140 @cloche_m141 cloche_K cloche_Z
+@cloche_r422 springDamper @cloche_m140 @cloche_m156 cloche_K cloche_Z
+@cloche_r423 springDamper @cloche_m140 @cloche_m157 cloche_K cloche_Z
+@cloche_r424 springDamper @cloche_m141 @cloche_m142 cloche_K cloche_Z
+@cloche_r425 springDamper @cloche_m141 @cloche_m157 cloche_K cloche_Z
+@cloche_r426 springDamper @cloche_m141 @cloche_m158 cloche_K cloche_Z
+@cloche_r427 springDamper @cloche_m142 @cloche_m143 cloche_K cloche_Z
+@cloche_r428 springDamper @cloche_m142 @cloche_m158 cloche_K cloche_Z
+@cloche_r429 springDamper @cloche_m142 @cloche_m159 cloche_K cloche_Z
+@cloche_r430 springDamper @cloche_m143 @cloche_m144 cloche_K cloche_Z
+@cloche_r431 springDamper @cloche_m143 @cloche_m159 cloche_K cloche_Z
+@cloche_r432 springDamper @cloche_m144 @cloche_m145 cloche_K cloche_Z
+@cloche_r433 springDamper @cloche_m144 @cloche_m159 cloche_K cloche_Z
+@cloche_r434 springDamper @cloche_m145 @cloche_m146 cloche_K cloche_Z
+@cloche_r435 springDamper @cloche_m146 @cloche_m147 cloche_K cloche_Z
+@cloche_r436 springDamper @cloche_m147 @cloche_m148 cloche_K cloche_Z
+@cloche_r437 springDamper @cloche_m148 @cloche_m149 cloche_K cloche_Z
+@cloche_r438 springDamper @cloche_m149 @cloche_m150 cloche_K cloche_Z
+@cloche_r439 springDamper @cloche_m150 @cloche_m151 cloche_K cloche_Z
+@cloche_r440 springDamper @cloche_m151 @cloche_m152 cloche_K cloche_Z
+@cloche_r441 springDamper @cloche_m152 @cloche_m153 cloche_K cloche_Z
+@cloche_r442 springDamper @cloche_m153 @cloche_m154 cloche_K cloche_Z
+@cloche_r443 springDamper @cloche_m154 @cloche_m155 cloche_K cloche_Z
+@cloche_r444 springDamper @cloche_m155 @cloche_m156 cloche_K cloche_Z
+@cloche_r445 springDamper @cloche_m156 @cloche_m157 cloche_K cloche_Z
+@cloche_r446 springDamper @cloche_m157 @cloche_m158 cloche_K cloche_Z
+@cloche_r447 springDamper @cloche_m158 @cloche_m159 cloche_K cloche_Z
+
+@in1 posInput [6.20 0.00 7.00]
+@cloche_exc contact @cloche_m16 @in1 0.1 0.001
+@out1 posOutput @cloche_m8
+@out2 posOutput @cloche_m37
+
+# 160 masses, 448 interactions
+# end of MIMS script

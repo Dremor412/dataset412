@@ -1,0 +1,8 @@
+Sources du générateur officiel MIMS4Max (gen~ / .gendsp), copiées sans
+modification depuis https://github.com/mi-creative/mi-gen
+(extras/mi-gen~/MIMS4Max/MIMS_NodeJS), auteur James Leonard.
+Licence : GNU GPL v3 (voir le dépôt mi-gen).
+
+build.js les enveloppe dans un petit chargeur CommonJS (MIMS4MAX) pour
+qu'elles tournent dans la page. On s'en sert pour l'export vers Max :
+le code gen~ produit est donc celui de l'outil officiel.

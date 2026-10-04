@@ -1,106 +1,113 @@
-# MIMS Studio
+# mi-gen Studio
 
-Remplacement local et stable de l'outil web « MIMS online » (mi-creative) :
-visualiseur / éditeur / simulateur de modèles physiques masse-interaction,
-en pur Python (tkinter + numpy, rien d'autre à installer).
+Atelier de création pour **mi-gen** (synthèse sonore par masses-interactions
+pour Max/MSP `gen~`) : on construit, on joue et on entend dans le navigateur,
+puis on exporte vers Max.
 
-## Lancer
-
-Double-clique `MIMS_Studio.bat` — ou en console :
-
-    python MIMS_Studio.py
-
-## Version navigateur (macOS sans Python / tkinter)
-
-`MIMS_Studio.html` est un portage complet en un seul fichier HTML :
-même parseur, même moteur physique (vérifié identique à 15 chiffres
-près), mêmes 13 générateurs, même import OBJ. **Aucune installation** :
-envoie juste ce fichier (AirDrop, mail...) et double-clique dessus —
-il s'ouvre dans Safari ou Chrome, tout tourne en local dans la page.
-
-Seules différences : « Enregistrer » télécharge le `.mdl` dans le
-dossier Téléchargements (un navigateur ne peut pas réécrire un fichier
-sur place), et le menu Exemples régénère les formes au lieu de lire le
-dossier `mims-formes-3d`. C'est la solution pour les Mac récents
-(Sequoia et suivants) dont le `python3` d'Apple n'inclut pas tkinter.
-
-## Nouveautés
-
-### Son temps réel (version navigateur)
-
-Bouton **🔈 Son** : la simulation tourne à la fréquence audio, un pas de
-calcul par échantillon, comme `gen~` dans mi-gen. Le calcul se fait dans un
-AudioWorklet, avec un ScriptProcessor en secours.
-
-- Les `posOutput` / `frcOutput` vont aux haut-parleurs : 1re sortie à
-  gauche, 2e à droite, etc. Sans sortie dans le script, on écoute deux
-  masses de l'objet.
-- **Frapper** (ou la **barre espace**) avec le curseur **force**.
-- **Attraper la bille jaune** (`posInput`) et la glisser verticalement pour
-  appuyer, frotter ou pincer l'objet selon l'interaction qui la relie
-  (contact, nlBow, nlPluck). Ça marche aussi sans le son.
-- **volume** : gain en dB avant un limiteur doux (tanh).
-- Les paramètres des formes générées ont été réglés pour l'animation. En
-  son, un `Zo` élevé donne un son très court : baisse-le (ex. `_Zo param
-  0.0005`) pour une résonance plus longue.
-
-### Points de fixation : correction de l'effondrement
-
-Avant, les objets générés s'affaissaient jusqu'à la hauteur des points
-fixes, même sans être frappés. La cause : comme dans mi-gen, les ressorts
-n'ont pas de longueur au repos (`f = K·(x1 − x2)`), mais la hauteur `z`
-sert ici aussi à dessiner la forme. Chaque ressort tirait donc ses deux
-masses à la même hauteur.
-
-Maintenant, les liaisons de structure (`spring`, `damper`, `springDamper`,
-`nlSpring2/3`, `nlSpringDamper`) travaillent sur l'écart à la position de
-repos, et les `osc` oscillent autour de leur propre `z`. C'est la physique
-mi-gen, où le repos joue le rôle du 0. Les interactions « outil »
-(`contact`, `nlContact`, `nlPluck`, `nlBow`) restent en hauteurs absolues :
-ce sont de vraies collisions entre la bille et l'objet.
-
-Vérifié sur les 13 formes : aucune dérive au repos, et retour exact à la
-forme après une frappe. La correction est faite dans les deux versions
-(HTML et Python).
+**Un seul fichier, rien à installer** : ouvre `MIMS_Studio.html` dans Chrome,
+Edge, Firefox ou Safari. Tout tourne en local.
 
 ## Ce que ça fait
 
-- **Éditeur de scripts MIMS** (dialecte du site : masses avec positions 3D
-  `[x y z]`) avec compilation automatique et **messages d'erreur précis avec
-  numéro de ligne** (double-clic sur une erreur = aller à la ligne).
-- **Vue 3D** : orbite (glisser gauche), zoom (molette), déplacement
-  (glisser droit), recadrage (double-clic), sélection d'une bille (clic).
-  Couleurs : bleu = masse, rouge = point fixe, jaune = posInput,
-  cercle vert = sortie écoutée, orange pointillé = contact, violet = archet.
-- **Simulation physique animée** : bouton *Simuler*, puis *Frapper* pour
-  donner une impulsion à la bille sélectionnée. Curseurs *vitesse*
-  (pas de calcul par image) et *amplification* (exagération visuelle du
-  mouvement). Le moteur est un portage fidèle de celui du site
-  (schéma saute-mouton, mêmes formules, y compris contacts et archets
-  non linéaires). Garde-fou anti-explosion intégré.
-- **Menu Générer** : 13 formes paramétriques (boîte, sphère, tore debout,
-  cloche, grosse caisse, donut coupé, colimaçon, orgue de Fibonacci,
-  ruban de Möbius, sablier, arbre binaire...).
-- **Menu Importer** : convertit un modèle 3D `.obj` (Blender...) en réseau
-  masses-ressorts, avec simplification (« masses visées » et « plafond
-  ressorts ») qui garantit un objet d'un seul tenant.
-- **Menu Exemples** : ouvre directement les `.mdl` du dossier
-  `mims-formes-3d` voisin.
+- **Construire**
+  - Des modèles prêts à jouer : corde pincée, corde frottée (archet), corde au
+    marteau, membrane, corde couplée à une membrane, oscillateurs.
+  - 13 formes 3D paramétriques.
+  - Des briques à ajouter en un clic : corde, corde raide, chaîne, membrane
+    (structures intégrées mi-gen), oscillateur, masse, point fixe.
+  - Clique un point dans la vue 3D : l'inspecteur propose **Frapper**,
+    **Pincer**, **Frotter**, **Coup de force**, **Écouter**, **Supprimer**.
+    Maj+clic sur un 2e point : **Relier**. Sur une corde ou une membrane, le
+    point devient un **proxy** mi-gen, et un curseur permet ensuite de le
+    déplacer.
+- **Importer un objet 3D** (`.obj`, `.stl` texte ou binaire)
+  - Les sommets en double sont soudés et le maillage est simplifié pour
+    **tenir dans le budget de ta machine**.
+  - Les morceaux séparés sont reliés entre eux, et un squelette connexe est
+    gardé quand on plafonne les ressorts.
+  - Au choix : axe vertical, taille et points de fixation (base, sommet ou
+    aucun). Un aperçu en direct donne le nombre de masses, de ressorts et la
+    charge CPU.
+- **Jouer**
+  - **Son temps réel** : un pas de calcul par échantillon, comme `gen~`. Le
+    calcul tourne dans un AudioWorklet, avec un volume automatique.
+  - **Bille jaune** à attraper à la souris (contact, pincement).
+  - **Archet** entraîné avec un curseur de vitesse.
+  - **Frapper** avec la barre espace.
+  - **Réglages** : chaque `@param` devient un curseur qui agit pendant que ça
+    joue, sans coupure, et sa valeur est recopiée dans le script.
+- **Budget matériel** : au démarrage, le studio mesure le coût réel d'une masse
+  et d'une liaison sur ta machine. La jauge en bas indique la charge du son
+  (mesurée dans le fil audio quand le son tourne). Au-delà de 100 %, le son
+  décroche.
+- **Export Max**
+  - Le `.gendsp` est prêt pour `[gen~]`. Il est produit par le **générateur
+    officiel MIMS4Max**, inclus dans la page.
+  - Le `.mdl` exporté s'ouvre aussi dans MIMS4Max.
+  - Les fichiers `.mdl` de mi-gen s'ouvrent ici tels quels.
 
-## Organisation du code
+## Format des fichiers
 
-    MIMS_Studio.py          lanceur
-    studio/
-      model.py              structures (Masse, Interaction, Modele)
-      parser_mdl.py         analyse des scripts .mdl (erreurs par ligne)
-      view3d.py             vue 3D tkinter (projection, orbite, rendu)
-      simulator.py          physique numpy (portage du moteur du site)
-      generators.py         catalogue des formes + import OBJ
-      _source_formes.py     compilateur de formes (copie de forme2mims)
-      ui_main.py            fenêtre principale, menus, dialogues
+C'est la syntaxe **MIMS4Max**. Un même fichier s'ouvre ici et dans Max :
 
-## Idées pour la suite (non fait)
+    @corde string 60 1. corde_K corde_Z corde_Zo 0. 0.     # structure intégrée
+    @in1 posInput 0.
+    @pince nlPluck [@corde pince_pos] @in1 0.5 0.1 0.001    # proxy sur la corde
+    @out1 posOutput [@corde 0.8]
+    @peau closedMesh 16 16 1. K Z Zo 0. 0.
+    @choc contact [@peau 0.4 0.35] @in2 0.1 0.002 -3        # proxy sur la membrane
 
-- Son temps réel dans la version Python (sounddevice) : fait côté navigateur.
-- Édition graphique : ajouter/relier des masses à la souris.
-- Export du réseau vers le format MIMS4Max (gen~) de Max/MSP.
+La géométrie 3D est **purement visuelle**. Elle est rangée dans des lignes `~`,
+que MIMS4Max ignore :
+
+    ~pos @in1 -5.5 0 0                 # position d'une masse / entrée
+    ~place @corde -12 0 0 12 0 0       # extrémités d'une corde, coins d'une membrane
+
+La physique est exactement celle de mi-gen. La position d'un point est un
+déplacement, et on le dessine à la hauteur `~pos + déplacement`. Pour qu'une
+bille posée 3 unités au-dessus d'un objet le touche en descendant, son contact
+a un seuil de `-3`. Les générateurs le calculent tout seuls.
+
+L'ancien format du studio, avec les positions `[x y z]` dans la ligne de
+masse, est encore lu. À l'export vers Max, il est converti et les seuils de
+contact sont recalculés.
+
+## Organisation
+
+    MIMS_Studio.html        le studio (fichier généré : ne pas éditer)
+    build.js                assemble src/ -> MIMS_Studio.html   (node build.js)
+    src/
+      index.html, style.css
+      js/01-modele.js       analyse des scripts (syntaxe MIMS4Max + ~pos/~place)
+      js/10-simulateur.js   moteur mi-gen : compilation, structures intégrées, proxies
+      js/20-son.js          son temps réel (AudioWorklet)
+      js/25-budget.js       mesure de la machine, charge CPU, tailles maximales
+      js/30-formes.js       13 formes 3D paramétriques
+      js/35-import3d.js     import .obj / .stl, simplification au budget
+      js/36-modeles.js      modèles prêts à jouer, briques, actions de l'inspecteur
+      js/40-vue3d.js        vue 3D (canvas)
+      js/60-export.js       conversion MIMS4Max + appel du générateur officiel
+      js/70-app.js          interface
+      vendor/mims4max/      générateur officiel MIMS4Max (mi-gen, GPL v3), non modifié
+    tests/
+      scenario_ui.js        pilote toute l'interface dans Chromium (Playwright)
+      exemples_officiels.js compare l'export aux sorties de MIMS4Max sur les exemples mi-gen
+      fichiers/             objets 3D et ancien format pour les tests
+
+Tests (Node + Playwright) :
+
+    node build.js
+    node tests/scenario_ui.js
+    node tests/exemples_officiels.js <chemin vers un clone de mi-gen>
+
+## Version Python (ancienne)
+
+`MIMS_Studio.py` et `studio/` sont la version 0.1 (tkinter + numpy). Elle
+contient la correction des points de fixation, mais pas les nouveautés
+ci-dessus. La version à utiliser est le HTML.
+
+## Licence
+
+`src/vendor/mims4max` provient de mi-gen (James Leonard), sous licence GNU GPL
+v3. Le fichier `MIMS_Studio.html`, qui l'inclut, est donc à diffuser selon les
+termes de la GPL v3.
