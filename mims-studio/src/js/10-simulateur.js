@@ -179,7 +179,14 @@ function compiler(mdl, options = {}) {
     liens.push({ code: CODES_INTER.indexOf(it.genre), i1, i2, args, nom: it.nom });
   }
   const entrees = mdl.entrees.map(e => ({ nom: e.nom, i: resout(e.cible) }));
-  const sorties = mdl.sorties.map(s => ({ nom: s.nom, genre: s.genre, i: resout(s.cible) }));
+  // routage : pan (stereo) reparti de gauche a droite par defaut, gain en dB, canal (multicanal)
+  const sorties = mdl.sorties.map((s, k, tout) => {
+    const r = mdl.routage.get(s.nom) || {};
+    const panDefaut = tout.length > 1 ? -1 + 2 * k / (tout.length - 1) : 0;
+    return { nom: s.nom, genre: s.genre, i: resout(s.cible),
+             pan: r.pan === null || r.pan === undefined ? panDefaut : Math.min(Math.max(r.pan, -1), 1),
+             gain: r.gain || 0, canal: r.canal || k + 1, muet: !!r.muet };
+  });
 
   // hauteur affichee d'un point (proxy = interpolee)
   const hauteur = i => i < nbNoeuds ? N.gz[i]
@@ -392,7 +399,9 @@ class Simulateur {
     for (let i = 0; i < n; i++) {
       const e = etat[i];
       if (e === MOBILE) {
-        const un = A[i] * u[i] + B[i] * ur[i] + (f[i] - grav[i]) * invM[i];
+        // (+1e-18 -1e-18) ramene a 0 les valeurs infimes : sans ca, quand le son
+        // s'eteint, le processeur passe en nombres "denormaux", jusqu'a 100x plus lents
+        const un = (A[i] * u[i] + B[i] * ur[i] + (f[i] - grav[i]) * invM[i] + 1e-18) - 1e-18;
         ur[i] = u[i]; u[i] = un;
       } else if (e === ENTREE) {
         cible[i] += this.vitesse[i];
@@ -490,3 +499,48 @@ const SOURCE_MOTEUR = () => [
   `const NB_ARGS = ${NB_ARGS}, MOBILE = ${MOBILE}, FIXE = ${FIXE}, ENTREE = ${ENTREE};`,
   Simulateur.toString(),
 ].join("\n");
+
+/* Marge de stabilite (schema saute-mouton) : pour une masse seule,
+ * le calcul reste stable tant que (K + 2 Z) / M < 4. Pour un reseau, on
+ * borne K et Z par la somme des liaisons (Gershgorin) : 2x pour une
+ * liaison vers une masse mobile, 1x vers un point fixe. Contacts compris
+ * (quand ils touchent). Renvoie le pire rapport (< 1 = stable) et le point. */
+function margeStabilite(desc) {
+  const n = desc.nbNoeuds, K = new Float64Array(n), Z = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    if (desc.etat[i] !== MOBILE) continue;
+    const M = 1 / desc.invM[i];                       // osc : A = 2-(K+Z)/M, B = Z/M-1
+    Z[i] = (desc.B[i] + 1) * M;
+    K[i] = (2 - desc.A[i]) * M - Z[i];
+  }
+  const ajoute = (i, k, z, poids, autreMobile) => {
+    const f = autreMobile ? 2 : 1;
+    if (i < n) { if (desc.etat[i] === MOBILE) { K[i] += f * k; Z[i] += f * z; } return; }
+    const p = desc.proxies[i - n];
+    p.noeuds.forEach((m, j) => { if (desc.etat[m] === MOBILE) { K[m] += f * k * p.poids[j]; Z[m] += f * z * p.poids[j]; } });
+  };
+  const mobile = i => i >= n || desc.etat[i] === MOBILE;
+  for (const l of desc.liens) {
+    let k = 0, z = 0;
+    const a = l.args;
+    switch (l.code) {
+      case 0: k = a[0]; break;
+      case 1: z = a[0]; break;
+      case 2: case 3: k = a[0]; z = a[1] || 0; break;
+      case 4: case 5: k = Math.max(a[0], a[2] || 0); z = a[3] || 0; break;
+      case 6: case 7: k = a[0]; z = a[2] || 0; break;
+      case 8: k = a[0]; z = a[2] || 0; break;
+      case 9: z = a[0]; break;
+    }
+    k = Math.abs(k || 0); z = Math.abs(z || 0);
+    ajoute(l.i1, k, z, 1, mobile(l.i2));
+    ajoute(l.i2, k, z, 1, mobile(l.i1));
+  }
+  let pire = 0, ou = -1;
+  for (let i = 0; i < n; i++) {
+    if (desc.etat[i] !== MOBILE) continue;
+    const r = (K[i] + 2 * Z[i]) * desc.invM[i] / 4;
+    if (r > pire) { pire = r; ou = i; }
+  }
+  return { rapport: pire, noeud: ou };
+}

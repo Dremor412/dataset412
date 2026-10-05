@@ -35,7 +35,7 @@ code { background: #2a303b; padding: 0 4px; border-radius: 3px; }
 @media (max-width: 900px) { #gauche { flex-basis: 300px; } }
 
 #onglets { display: flex; flex: 0 0 auto; background: var(--panneau); border-bottom: 1px solid var(--bord); }
-#onglets button { flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
+#onglets button { flex: 1; font-size: 12.5px; background: none; border: none; border-bottom: 2px solid transparent;
                   color: var(--discret); font: inherit; padding: 8px 4px; cursor: pointer; }
 #onglets button:hover { color: var(--texte); }
 #onglets button.actif { color: var(--texte); border-bottom-color: var(--accent); }
@@ -139,3 +139,40 @@ dialog input[type="range"] { flex: 1; }
 dialog .actions { margin-top: 14px; text-align: center; }
 dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-radius: 6px; font-size: 12.5px; min-height: 2.6em; }
 #dlg-aide pre { font: 12px/1.6 Consolas, Menlo, monospace; white-space: pre-wrap; margin: 0; }
+
+/* ---------- mode Editer, ecoute, legende, tutoriel ---------- */
+#barre-mode { position: absolute; top: 10px; left: 10px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+              background: rgba(27,31,38,.9); border: 1px solid #3a4454; border-radius: 8px; padding: 5px; max-width: calc(100% - 290px); }
+#barre-mode .btn { padding: 3px 8px; font-size: 12px; }
+#barre-mode label { color: var(--discret); font-size: 12px; display: inline-flex; gap: 4px; align-items: center; }
+#barre-mode input[type="number"] { width: 52px; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; }
+#outils-edition { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+#outils-edition[hidden] { display: none; }
+.sep-v { width: 1px; height: 20px; background: #3a4454; margin: 0 3px; }
+.btn.outil.actif { background: #2b5f8a; border-color: var(--accent); }
+.sortie { display: grid; grid-template-columns: 38px minmax(70px, 1fr) 78px 44px 16px 16px; gap: 6px; align-items: center; margin: 4px 0;
+          background: var(--panneau2); border: 1px solid var(--bord); border-radius: 6px; padding: 5px 7px; }
+.sortie .cible { color: var(--discret); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sortie input[type="range"] { width: 100%; }
+.sortie select, .sortie input[type="number"] { width: 100%; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; }
+.sortie button { background: none; border: none; color: var(--discret); cursor: pointer; padding: 0; font-size: 14px; }
+.sortie button.on { color: var(--erreur); }
+#liste-legende { margin: 6px 0; font-size: 12px; }
+#liste-legende dt { font-weight: 600; float: left; width: 58px; clear: left; color: var(--accent); }
+#liste-legende dd { margin: 0 0 4px 62px; color: var(--discret); }
+.reglage .role { grid-column: 1 / -1; margin-top: -3px; font-size: 11px; color: var(--discret); }
+.reglage.instable label { color: var(--erreur); }
+#stabilite.alerte { color: var(--erreur); }
+#tuto { position: absolute; left: 10px; bottom: 34px; width: 340px; background: rgba(30,35,44,.97); border: 1px solid var(--accent);
+        border-radius: 8px; padding: 10px 12px; box-shadow: 0 6px 22px rgba(0,0,0,.5); }
+#tuto h4 { margin: 2px 0 6px; font-size: 14px; }
+#tuto-texte { font-size: 12.5px; line-height: 1.5; }
+#tuto-texte b { color: #ffd166; }
+.actions-tuto { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+.actions-tuto .btn { padding: 3px 8px; font-size: 12px; }
+#tuto.fait #tuto-etape::after { content: "  ✓ fait !"; color: #58d68d; }
+.insp-coords:empty { display: none; }
+.insp-coords { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 4px 0 8px; }
+.insp-coords input { width: 100%; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; font: 12px Consolas, Menlo, monospace; }
+.insp-coords span { grid-column: 1 / -1; font-size: 11px; color: var(--discret); }
+#insp-aide { font-size: 11.5px; color: var(--discret); margin-top: 8px; }

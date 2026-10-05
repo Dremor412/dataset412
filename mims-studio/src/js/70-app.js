@@ -19,12 +19,19 @@ const app = {
 
   init() {
     this.vue = new Vue3D($("vue3d"), {
-      surSelection: (i, j) => this.majInspecteur(),
+      surSelection: () => this.majInspecteur(),
       surPlacement: (i, z) => this.placer(i, z),
+      surDeplacement: (ids, dv) => this.deplacer(ids, dv),
+      surCreation: (outil, p0, p1) => this.creer(outil, p0, p1),
+      surRelier: (i, j) => this.ajouterLignes(lignesLien(this.modele, this.desc, i, j)),
     });
     son.surMessage = d => this._messageSon(d);
     this._construitConstruire();
     this._branche();
+    this._brancheEdition();
+    this._brancheEcoute();
+    this._brancheSecours();
+    tuto.init();
     $("sld-ampli").value = 10;
     this.charger(MODELES_PRETS[0].script(), "corde-pincee.mdl");
     setTimeout(() => { budget.mesurer(); this.majJauge(); }, 300);
@@ -37,6 +44,8 @@ const app = {
     if (nom) { this.fichierNom = nom; document.title = `mi-gen Studio — ${nom}`; }
     this.reglagesAudio = new Map();
     this.valeursInitiales = new Map();
+    this._stables = null;
+    this.historique.push($("editeur").value);
     this.compiler({ garderVue: false });
   },
 
@@ -59,8 +68,11 @@ const app = {
     if (son.actif) this._envoieModeleSon(false);
     this._appliqueArchet();
     this._construitReglages();
+    if (son.multi && mdl.sorties.length !== son.nCanaux && son.ctx) this._modeCanaux();
+    this.majEcoute();
     this.majInspecteur();
     this.majJauge();
+    tuto.verifier();
     this.statut(`${statsModele(mdl)}`);
     $("stats-script").textContent = statsModele(mdl);
     if ($("p-export").classList.contains("actif")) this.majExport();
@@ -118,6 +130,7 @@ const app = {
     document.querySelectorAll("#onglets button").forEach(b => b.classList.toggle("actif", b.dataset.onglet === nom));
     document.querySelectorAll(".panneau").forEach(p => p.classList.toggle("actif", p.id === "p-" + nom));
     if (nom === "export") this.majExport();
+    if (typeof tuto !== "undefined") tuto.verifier();
   },
 
   /* ================= onglet Construire ================= */
@@ -211,8 +224,34 @@ const app = {
   },
 
   ajouterLignes(ajout, garderVue = true) {
-    $("editeur").value = insererLignes($("editeur").value, ajout);
+    this.modifierTexte(insererLignes($("editeur").value, ajout), garderVue);
+  },
+
+  /* toute modification du script passe ici : historique pour Annuler / Refaire */
+  historique: [],
+  futur: [],
+  modifierTexte(texte, garderVue = true) {
+    const avant = $("editeur").value;
+    if (texte === avant) return;
+    this.historique.push(avant);
+    if (this.historique.length > 200) this.historique.shift();
+    this.futur = [];
+    $("editeur").value = texte;
     this.compiler({ garderVue });
+  },
+  annuler() {
+    if (!this.historique.length) { this.statut("rien à annuler"); return; }
+    this.futur.push($("editeur").value);
+    $("editeur").value = this.historique.pop();
+    this.compiler();
+    this.statut("annulé");
+  },
+  refaire() {
+    if (!this.futur.length) { this.statut("rien à refaire"); return; }
+    this.historique.push($("editeur").value);
+    $("editeur").value = this.futur.pop();
+    this.compiler();
+    this.statut("refait");
   },
 
   /* ================= inspecteur (point selectionne) ================= */
@@ -372,6 +411,8 @@ const app = {
       for (const q of this.modele.params.values())            // params qui en dependent
         if (q.genre === "param" && q !== p) { try { q.valeur = evalue(q.brut, this.modele.params); } catch (e) { /* garde */ } }
     }
+    this._dernierChangement = performance.now();
+    this._majStabilite();
     this.rafraichirPhysique();
   },
 
@@ -417,19 +458,22 @@ const app = {
     btn.textContent = "🔊 Son"; btn.classList.add("actif");
     $("lbl-vitesse").classList.add("grise");
     this._envoieVolume();
+    if (son.multi) this._modeCanaux();
     this._envoieModeleSon(false);
     this._appliqueArchet();
     const nb = this.modele ? this.modele.sorties.length : 0;
     this.statut(`son actif · ${son.frequence} Hz · ` +
       (nb ? `${nb} sortie(s) écoutée(s)` : "pas de posOutput : on écoute 2 masses de l'objet") + " · espace = frapper");
     this.majJauge();
+    tuto.verifier();
   },
 
   _envoieVolume() { son.envoyer({ type: "gain", v: 10 ** (+$("sld-volume").value / 20), auto: $("chk-autovol").checked }); },
 
   _messageSon(d) {
-    if (d.type === "explosion") this.statut("EXPLOSION numérique → reset (baisse une raideur K ou monte un amortissement Z)");
+    if (d.type === "explosion") this.secours(true);
     else if (d.type === "etat" && son.actif && this.desc && d.u.length === this.desc.nbNoeuds + this.desc.nbProxies) {
+      this._noteStable();
       this.vue.majPositions(d.u, +$("sld-ampli").value, this._entraines);
       if (d.charge > 0) this._chargeMesuree = d.charge;
       this.majJauge();
@@ -450,7 +494,8 @@ const app = {
     $("btn-anim").textContent = "⏸ Pause"; $("btn-anim").classList.add("actif");
     const boucle = () => {
       if (!this.anime || !this.sim) return;
-      if (!this.sim.pas(+$("sld-vitesse").value)) this.statut("EXPLOSION numérique → reset (baisse une raideur K ou monte un amortissement Z)");
+      if (!this.sim.pas(+$("sld-vitesse").value)) this.secours(true);
+      else this._noteStable();
       this.vue.majPositions(this.sim.u, +$("sld-ampli").value, this._entraines);
       requestAnimationFrame(boucle);
     };
@@ -698,27 +743,8 @@ const app = {
       if (mod && e.key.toLowerCase() === "o") { e.preventDefault(); $("fichier-mdl").click(); }
       const saisie = /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName) || document.querySelector("dialog[open]");
       if (e.key === " " && !saisie && !mod) { e.preventDefault(); this.frapper(); }
-      if (e.key === "Escape" && !saisie) { this.vue.selection = this.vue.selection2 = -1; this.vue.redessiner(); this.majInspecteur(); }
+      if (e.key === "Escape" && !saisie) { this.vue.choisir(-1); if (this.vue.edition) this.choisirOutil("selection"); }
     });
   },
 };
 
-app.init();
-
-/* auto-test : ouvrir avec #selftest dans l'URL */
-if (location.hash === "#selftest") {
-  setTimeout(() => {
-    const r = [];
-    for (const m of MODELES_PRETS) {
-      const mdl = parse(m.script());
-      const s = new Simulateur(compiler(mdl));
-      s.frapper(Math.floor(s.n / 2), 0.3);
-      if (s.entrees.length) s.pousser(0.3, 30);
-      s.pas(3000);
-      r.push(`${m.id}: ${mdl.erreurs.length} erreur(s), amplitude ${s.amplitude().toExponential(2)}`);
-    }
-    r.push("SELFTEST OK");
-    window._selftest = r.join("\n");
-    console.log(window._selftest);
-  }, 500);
-}

@@ -148,6 +148,7 @@ function nouveauModele() {
     erreurs: [],              // [ligne, message]
     avertissements: [],
     legacy: false,            // ancien dialecte (positions 3D dans la ligne de masse)
+    routage: new Map(),       // ~sortie @outN pan p gain dB canal c muet : nom -> reglages
   };
 }
 
@@ -212,6 +213,16 @@ function parse(texte) {
       const v = p.slice(2).map(Number);
       if (v.some(Number.isNaN)) { err(num, "~pos : coordonnees non numeriques"); return; }
       geo.set(p[1].slice(1), v);
+      return;
+    }
+    if (p[0] === "~sortie") {                    // routage d'une sortie (studio seulement)
+      if (p.length < 2 || !/^@/.test(p[1])) { err(num, "~sortie : attendu ~sortie @outN pan p gain dB canal c"); return; }
+      const r = { pan: null, gain: 0, canal: null, muet: false };
+      for (let k = 2; k < p.length; k++) {
+        if (p[k] === "muet") r.muet = true;
+        else if (["pan", "gain", "canal"].includes(p[k]) && k + 1 < p.length) { r[p[k]] = Number(p[k + 1]); k++; }
+      }
+      mdl.routage.set(p[1].slice(1), r);
       return;
     }
     if (p[0] === "~place") {

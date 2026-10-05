@@ -31,8 +31,15 @@ class Vue3D {
 
     this.desc = null;
     this.pos = new Float64Array(0);      // x y z par point (noeuds puis proxies)
-    this.selection = -1;
-    this.selection2 = -1;
+    this.selection = -1;                 // point principal (dernier clique)
+    this.selection2 = -1;                // 2e point quand exactement deux sont choisis
+    this.multi = new Set();              // tous les points selectionnes
+    this.edition = false;                // mode Editer
+    this.outil = "selection";            // selection | mass | osc | ground | relier | corde | membrane
+    this.planZ = 4;                      // hauteur du plan de travail
+    this.pas = 0.5;                      // magnetisme (0 = libre)
+    this._apercu = null;                 // trace en cours (corde, membrane, cadre)
+    this._relierDepuis = -1;
     this._plancher = new Set();
     this._drag = null;
     this._demandeDessin = false;
@@ -84,9 +91,12 @@ class Vue3D {
       this._entreesForce = new Set(desc.entrees.map(e => e.i));
       this._plancher = new Set(desc.plancher || []);
     }
-    if (!ancien || !desc || this.selection >= T || ancien.noms[this.selection] !== (desc.noms[this.selection]))
-      this.selection = -1;
-    if (this.selection2 >= T) this.selection2 = -1;
+    // garde la selection si les points existent toujours (memes noms)
+    const garde = i => ancien && desc && i < T && ancien.noms[i] === desc.noms[i];
+    this.multi = new Set([...this.multi].filter(garde));
+    if (!garde(this.selection)) this.selection = this.multi.size ? [...this.multi].pop() : -1;
+    this._majSelection2();
+    if (!garde(this._relierDepuis)) this._relierDepuis = -1;
     if (garderVue) this.redessiner(); else this.recadrer();
   }
 
@@ -238,15 +248,26 @@ class Vue3D {
         ctx.beginPath(); ctx.moveTo(px, py - r - 9); ctx.lineTo(px, py - r - 2);
         ctx.moveTo(px - 3, py - r - 5); ctx.lineTo(px, py - r - 2); ctx.lineTo(px + 3, py - r - 5); ctx.stroke();
       }
-      if (i === this.selection || i === this.selection2) {
+      if (this.multi.has(i) || i === this._relierDepuis) {
         ctx.strokeStyle = i === this.selection ? COULEURS.selection : COULEURS.selection2; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(px, py, r + 5, 0, TAU); ctx.stroke();
       }
     }
+    if (this.edition) this._dessineEdition();
   }
 
   _grille() {
     const ctx = this.ctx, L = 20, pas = 5;
+    if (this.edition && Math.abs(this.planZ) > 1e-6) {          // plan de travail
+      ctx.strokeStyle = "#1f3a4d"; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let i = -L; i <= L; i += pas / 2)
+        for (const [a, b] of [[[i, -L, this.planZ], [i, L, this.planZ]], [[-L, i, this.planZ], [L, i, this.planZ]]]) {
+          const [x1, y1] = this._projette(...a), [x2, y2] = this._projette(...b);
+          ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+        }
+      ctx.stroke();
+    }
     ctx.strokeStyle = COULEURS.grille; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath();
     for (let i = -L; i <= L; i += pas)
@@ -262,6 +283,138 @@ class Vue3D {
     }
   }
 
+  /* ---------------- selection ---------------- */
+
+  _majSelection2() {
+    this.selection2 = -1;
+    if (this.multi.size === 2) for (const i of this.multi) if (i !== this.selection) this.selection2 = i;
+  }
+
+  choisir(i, ajouter = false) {
+    if (i < 0) { if (!ajouter) { this.multi.clear(); this.selection = -1; } }
+    else if (ajouter && this.multi.has(i)) {
+      this.multi.delete(i);
+      if (this.selection === i) this.selection = this.multi.size ? [...this.multi].pop() : -1;
+    } else {
+      if (!ajouter) this.multi.clear();
+      this.multi.add(i); this.selection = i;
+    }
+    this._majSelection2();
+    if (this.rappels.surSelection) this.rappels.surSelection();
+    this.redessiner();
+  }
+
+  /* points deplacables : pas les proxies ni le sol ; un point de structure
+   * integree entraine toute la structure */
+  _aDeplacer(indices) {
+    const d = this.desc, res = new Set();
+    for (const i of indices) {
+      if (i >= d.nbNoeuds || this._plancher.has(i)) continue;
+      if (d.element[i] !== d.noms[i]) {
+        const mc = d.macros.find(m => m.nom === d.element[i]);
+        for (let k = 0; k < mc.nx * mc.ny; k++) res.add(mc.debut + k);
+      } else res.add(i);
+    }
+    return [...res];
+  }
+
+  /* ---------------- geometrie ecran <-> monde ---------------- */
+
+  /* point du plan horizontal z = h sous le pointeur (Newton sur la projection) */
+  surPlan(sx, sy, h) {
+    let x = this.cible[0], y = this.cible[1];
+    for (let it = 0; it < 8; it++) {
+      const [px, py] = this._projette(x, y, h);
+      const e = 1e-3;
+      const [ax, ay] = this._projette(x + e, y, h), [bx, by] = this._projette(x, y + e, h);
+      const j11 = (ax - px) / e, j21 = (ay - py) / e, j12 = (bx - px) / e, j22 = (by - py) / e;
+      const det = j11 * j22 - j12 * j21;
+      if (Math.abs(det) < 1e-9) break;
+      const rx = sx - px, ry = sy - py;
+      x += (j22 * rx - j12 * ry) / det;
+      y += (-j21 * rx + j11 * ry) / det;
+    }
+    const s = v => this.pas > 0 ? Math.round(v / this.pas) * this.pas : v;
+    return [s(x), s(y), h];
+  }
+
+  _centre(indices) {
+    const c = [0, 0, 0];
+    for (const i of indices) for (let k = 0; k < 3; k++) c[k] += this.pos[3 * i + k];
+    return c.map(v => v / Math.max(indices.length, 1));
+  }
+
+  /* poignees de deplacement : origine, extremites des fleches X Y Z */
+  _gizmo() {
+    if (!this.edition || this.outil !== "selection" || !this.desc) return null;
+    const ids = this._aDeplacer(this.multi);
+    if (!ids.length) return null;
+    const c = this._centre(ids);
+    const [ox, oy] = this._projette(...c);
+    const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(e => {
+      const [px, py] = this._projette(c[0] + e[0], c[1] + e[1], c[2] + e[2]);
+      const parUnite = Math.hypot(px - ox, py - oy) || 1e-3;
+      const L = 70 / parUnite;
+      const [ex, ey] = this._projette(c[0] + e[0] * L, c[1] + e[1] * L, c[2] + e[2] * L);
+      return { ex, ey, ux: (px - ox) / parUnite, uy: (py - oy) / parUnite, parUnite, vx: px - ox, vy: py - oy };
+    });
+    return { c, ox, oy, axes, ids };
+  }
+
+  _toucheGizmo(x, y) {
+    const g = this._gizmo();
+    if (!g) return null;
+    if (Math.abs(x - g.ox) < 9 && Math.abs(y - g.oy) < 9) return { g, axe: -1 };
+    for (let k = 0; k < 3; k++) {
+      const a = g.axes[k], dx = a.ex - g.ox, dy = a.ey - g.oy, L2 = dx * dx + dy * dy || 1;
+      const t = Math.min(Math.max(((x - g.ox) * dx + (y - g.oy) * dy) / L2, 0), 1);
+      if (t > 0.15 && Math.hypot(x - g.ox - t * dx, y - g.oy - t * dy) < 7) return { g, axe: k };
+    }
+    return null;
+  }
+
+  _dessineEdition() {
+    const ctx = this.ctx;
+    const g = this._gizmo();
+    if (g) {
+      const coul = ["#e05555", "#58d68d", "#5aa9e6"], noms = ["X", "Y", "Z"];
+      g.axes.forEach((a, k) => {
+        ctx.strokeStyle = coul[k]; ctx.fillStyle = coul[k]; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(g.ox, g.oy); ctx.lineTo(a.ex, a.ey); ctx.stroke();
+        const ang = Math.atan2(a.ey - g.oy, a.ex - g.ox);
+        ctx.beginPath(); ctx.moveTo(a.ex + 8 * Math.cos(ang), a.ey + 8 * Math.sin(ang));
+        ctx.lineTo(a.ex + 6 * Math.cos(ang + 2.3), a.ey + 6 * Math.sin(ang + 2.3));
+        ctx.lineTo(a.ex + 6 * Math.cos(ang - 2.3), a.ey + 6 * Math.sin(ang - 2.3)); ctx.fill();
+        ctx.font = "bold 11px sans-serif"; ctx.fillText(noms[k], a.ex + 10 * Math.cos(ang) - 4, a.ey + 10 * Math.sin(ang) + 4);
+      });
+      ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.fillRect(g.ox - 6, g.oy - 6, 12, 12);
+    }
+    const ap = this._apercu;
+    if (ap) {
+      ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      if (ap.type === "cadre") ctx.rect(ap.x0, ap.y0, ap.x1 - ap.x0, ap.y1 - ap.y0);
+      else if (ap.type === "corde" || ap.type === "lien") {
+        const [ax, ay] = this._projette(...ap.p0), [bx, by] = this._projette(...ap.p1);
+        ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      } else if (ap.type === "membrane") {
+        const c = [[ap.p0[0], ap.p0[1]], [ap.p1[0], ap.p0[1]], [ap.p1[0], ap.p1[1]], [ap.p0[0], ap.p1[1]]]
+          .map(([x, y]) => this._projette(x, y, ap.p0[2]));
+        ctx.moveTo(c[0][0], c[0][1]); for (const q of c.slice(1)) ctx.lineTo(q[0], q[1]); ctx.closePath();
+      } else if (ap.type === "point") {
+        const [px, py] = this._projette(...ap.p0);
+        ctx.setLineDash([]); ctx.arc(px, py, 6, 0, TAU);
+        const [qx, qy] = this._projette(ap.p0[0], ap.p0[1], 0);
+        ctx.moveTo(px, py); ctx.lineTo(qx, qy);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      if (ap.texte) {
+        ctx.fillStyle = "#ffd166"; ctx.font = "12px sans-serif";
+        ctx.fillText(ap.texte, ap.tx + 12, ap.ty - 10);
+      }
+    }
+  }
+
   /* ---------------- souris ---------------- */
 
   _xy(e) {
@@ -274,7 +427,7 @@ class Vue3D {
     const P = this._projetteTout();
     let best = -1, dmin = rayon;
     for (let i = 0; i < P.length / 4; i++) {
-      if ((filtre && !filtre(i)) || (this._plancher && this._plancher.has(i))) continue;
+      if ((filtre && !filtre(i)) || this._plancher.has(i)) continue;
       const dd = Math.hypot(P[4 * i] - ex, P[4 * i + 1] - ey);
       if (dd < dmin) { best = i; dmin = dd; }
     }
@@ -284,36 +437,87 @@ class Vue3D {
   _pointerDown(e) {
     const [x, y] = this._xy(e);
     this.canvas.setPointerCapture(e.pointerId);
-    const d = this.desc;
-    const bille = e.button === 0 && d ? this._plusProche(x, y, i => i < d.nbNoeuds && d.etat[i] === ENTREE, 14) : -1;
-    if (bille >= 0) {
-      this.selection = bille;
-      const s = this._projette(...this.pos.subarray(3 * bille, 3 * bille + 3))[3];
-      const echelle = Math.max(this.zoom * s * Math.cos(this.pitch), 1e-3);
-      this._drag = ["bille", y, this.pos[3 * bille + 2], bille, echelle];
-      if (this.rappels.surSelection) this.rappels.surSelection(bille, this.selection2);
-      this.canvas.style.cursor = "ns-resize";
-    } else if (e.button === 0) this._drag = ["maybe", x, y, e.shiftKey];
-    else this._drag = ["pan", x, y];
     e.preventDefault();
+    const d = this.desc;
+    // orbite / deplacement de la vue : clic droit (Maj = deplacer), milieu = deplacer
+    if (e.button === 1 || (e.button === 2 && (e.shiftKey || !this.edition))) { this._drag = ["pan", x, y]; return; }
+    if (e.button === 2 || (e.button === 0 && e.altKey)) { this._drag = ["orbit", x, y]; return; }
+    if (e.button !== 0) return;
+
+    if (!this.edition) {                                   // mode Jouer
+      const bille = d ? this._plusProche(x, y, i => i < d.nbNoeuds && d.etat[i] === ENTREE, 14) : -1;
+      if (bille >= 0) {
+        this.choisir(bille);
+        const s = this._projette(...this.pos.subarray(3 * bille, 3 * bille + 3))[3];
+        const echelle = Math.max(this.zoom * s * Math.cos(this.pitch), 1e-3);
+        this._drag = ["bille", y, this.pos[3 * bille + 2], bille, echelle];
+        this.canvas.style.cursor = "ns-resize";
+      } else this._drag = ["maybe", x, y, e.shiftKey];
+      return;
+    }
+
+    // mode Editer
+    if (this.outil === "selection") {
+      const t = this._toucheGizmo(x, y);
+      if (t) { this._debutDeplacement(t.g.ids, t.axe, x, y, t.g); return; }
+      const i = this._plusProche(x, y, null, 10);
+      if (i >= 0) {
+        if (!this.multi.has(i) || e.shiftKey) this.choisir(i, e.shiftKey);
+        const g = this._gizmo();
+        if (g) this._drag = ["attente-plan", x, y, g];
+        return;
+      }
+      this._drag = ["cadre", x, y, e.shiftKey];
+      return;
+    }
+    if (this.outil === "relier") {
+      const i = this._plusProche(x, y, null, 12);
+      if (i < 0) { this._relierDepuis = -1; this.redessiner(); return; }
+      if (this._relierDepuis < 0 || this._relierDepuis === i) { this._relierDepuis = i; this.redessiner(); return; }
+      const a = this._relierDepuis;
+      this._relierDepuis = e.shiftKey ? i : -1;
+      if (this.rappels.surRelier) this.rappels.surRelier(a, i);
+      return;
+    }
+    const p0 = this.surPlan(x, y, this.planZ);
+    if (this.outil === "corde" || this.outil === "membrane") { this._drag = ["trace", x, y, p0]; return; }
+    if (this.rappels.surCreation) this.rappels.surCreation(this.outil, p0, null);   // poser un point
+  }
+
+  _debutDeplacement(ids, axe, x, y, g) {
+    this._posDepart = this.pos.slice();
+    this._drag = ["deplace", x, y, ids, axe, g, [0, 0, 0]];
   }
 
   _pointerMove(e) {
+    const [x, y] = this._xy(e);
     if (this._drag === null) {
-      if (this.desc && e.pointerType === "mouse") {
-        const [x, y] = this._xy(e);
-        const d = this.desc;
+      if (!this.desc || e.pointerType !== "mouse") return;
+      const d = this.desc;
+      if (this.edition && ["mass", "osc", "ground", "corde", "membrane"].includes(this.outil)) {
+        const p = this.surPlan(x, y, this.planZ);
+        this._apercu = { type: "point", p0: p, texte: `${p[0].toFixed(1)}, ${p[1].toFixed(1)}, z ${p[2].toFixed(1)}`, tx: x, ty: y };
+        this.canvas.style.cursor = "crosshair";
+        this.redessiner();
+      } else if (this.edition && this.outil === "relier" && this._relierDepuis >= 0) {
+        const i = this._plusProche(x, y, null, 12);
+        const a = this.pos.subarray(3 * this._relierDepuis, 3 * this._relierDepuis + 3);
+        const b = i >= 0 ? this.pos.subarray(3 * i, 3 * i + 3) : this.surPlan(x, y, a[2]);
+        this._apercu = { type: "lien", p0: [...a], p1: [...b] };
+        this.redessiner();
+      } else if (this.edition && this.outil === "selection") {
+        this.canvas.style.cursor = this._toucheGizmo(x, y) ? "move" : this._plusProche(x, y, null, 10) >= 0 ? "pointer" : "default";
+      } else {
         const sur = this._plusProche(x, y, i => i < d.nbNoeuds && d.etat[i] === ENTREE, 14) >= 0;
         this.canvas.style.cursor = sur ? "ns-resize" : "grab";
       }
       return;
     }
-    const [x, y] = this._xy(e);
     const [mode, x0, y0] = this._drag;
     if (mode === "bille") {
       const [, yDepart, zDepart, i, echelle] = this._drag;
       let z = zDepart - (y - yDepart) / echelle;
-      if (this.desc.gz[i] >= 0) z = Math.max(z, 0);  // la bille ne traverse pas le plan
+      if (this.desc.gz[i] >= 0) z = Math.max(z, 0);      // la bille ne traverse pas le plan
       this.pos[3 * i + 2] = z;
       if (this.rappels.surPlacement) this.rappels.surPlacement(i, z);
       this.redessiner();
@@ -324,26 +528,86 @@ class Vue3D {
       this._drag = ["orbit", x0, y0];
       return this._pointerMove(e);
     }
+    if (mode === "attente-plan") {                        // glisser un point = deplacement dans le plan XY
+      if (Math.abs(x - x0) + Math.abs(y - y0) < 4) return;
+      const g = this._drag[3];
+      this._debutDeplacement(g.ids, -1, x0, y0, g);
+      return this._pointerMove(e);
+    }
+    if (mode === "deplace") {
+      const [, xs, ys, ids, axe, g] = this._drag;
+      const mx = x - xs, my = y - ys;
+      let dv = [0, 0, 0];
+      if (axe >= 0) {
+        const a = g.axes[axe];
+        dv[axe] = (mx * a.ux + my * a.uy) / a.parUnite;
+      } else {                                             // plan XY : systeme 2x2
+        const A = g.axes[0], B = g.axes[1], det = A.vx * B.vy - B.vx * A.vy;
+        if (Math.abs(det) > 1e-6) { dv[0] = (mx * B.vy - B.vx * my) / det; dv[1] = (A.vx * my - mx * A.vy) / det; }
+      }
+      if (this.pas > 0) dv = dv.map(v => Math.round(v / this.pas) * this.pas);
+      this._drag[6] = dv;
+      for (const i of ids) for (let k = 0; k < 3; k++) this.pos[3 * i + k] = this._posDepart[3 * i + k] + dv[k];
+      this._apercu = { type: "texte", texte: `Δ ${dv.map(v => v.toFixed(2)).join("  ")}`, tx: x, ty: y };
+      this.redessiner();
+      return;
+    }
+    if (mode === "cadre") {
+      this._apercu = { type: "cadre", x0: Math.min(x0, x), y0: Math.min(y0, y), x1: Math.max(x0, x), y1: Math.max(y0, y) };
+      this.redessiner();
+      return;
+    }
+    if (mode === "trace") {
+      const p0 = this._drag[3], p1 = this.surPlan(x, y, this.planZ);
+      const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      this._apercu = this.outil === "corde"
+        ? { type: "corde", p0, p1, texte: `corde ${L.toFixed(1)} (≈ ${Math.min(Math.max(Math.round(L * 2.5), 8), 200)} masses)`, tx: x, ty: y }
+        : { type: "membrane", p0, p1, texte: `membrane ${Math.abs(p1[0] - p0[0]).toFixed(1)} × ${Math.abs(p1[1] - p0[1]).toFixed(1)}`, tx: x, ty: y };
+      this.redessiner();
+      return;
+    }
     if (mode === "orbit") {
       this.yaw += (x - x0) * 0.008;
       this.pitch = Math.min(Math.max(this.pitch + (y - y0) * 0.008, -1.4), 1.5);
       this.canvas.style.cursor = "grabbing";
     } else { this.panx += x - x0; this.pany += y - y0; }
-    this._drag = [mode, x, y];
+    this._drag[1] = x; this._drag[2] = y;
     this.redessiner();
   }
 
   _pointerUp(e) {
-    if (this._drag && this._drag[0] === "maybe") {
-      const [x, y] = this._xy(e);
-      const i = this._plusProche(x, y, null, 12);
-      if (this._drag[3] && this.selection >= 0 && i >= 0 && i !== this.selection) this.selection2 = i;
-      else { this.selection = i; this.selection2 = -1; }
-      if (this.rappels.surSelection) this.rappels.surSelection(this.selection, this.selection2);
+    const dr = this._drag;
+    this._drag = null;
+    this.canvas.style.cursor = this.edition ? "default" : "grab";
+    if (!dr) return;
+    const [x, y] = this._xy(e);
+    if (dr[0] === "maybe") this.choisir(this._plusProche(x, y, null, 12), dr[3]);
+    else if (dr[0] === "attente-plan") { /* simple clic sur un point deja choisi */ }
+    else if (dr[0] === "cadre") {
+      const ap = this._apercu;
+      this._apercu = null;
+      if (!ap || ap.type !== "cadre") { this.choisir(-1, dr[3]); return; }
+      const P = this._projetteTout();
+      if (!dr[3]) this.multi.clear();
+      for (let i = 0; i < P.length / 4; i++)
+        if (!this._plancher.has(i) && P[4 * i] >= ap.x0 && P[4 * i] <= ap.x1 && P[4 * i + 1] >= ap.y0 && P[4 * i + 1] <= ap.y1) {
+          this.multi.add(i); this.selection = i;
+        }
+      if (!this.multi.size) this.selection = -1;
+      this._majSelection2();
+      if (this.rappels.surSelection) this.rappels.surSelection();
+      this.redessiner();
+    } else if (dr[0] === "deplace") {
+      this._apercu = null;
+      const dv = dr[6];
+      if (dv.some(v => v !== 0) && this.rappels.surDeplacement) this.rappels.surDeplacement([...this.multi], dv);
+      else { this.pos.set(this._posDepart); this.redessiner(); }
+    } else if (dr[0] === "trace") {
+      const p0 = dr[3], p1 = this.surPlan(x, y, this.planZ);
+      this._apercu = null;
+      if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 0.9 && this.rappels.surCreation) this.rappels.surCreation(this.outil, p0, p1);
       this.redessiner();
     }
-    this._drag = null;
-    this.canvas.style.cursor = "grab";
   }
 
   _zoomPas(pas) {

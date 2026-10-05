@@ -42,7 +42,7 @@ code { background: #2a303b; padding: 0 4px; border-radius: 3px; }
 @media (max-width: 900px) { #gauche { flex-basis: 300px; } }
 
 #onglets { display: flex; flex: 0 0 auto; background: var(--panneau); border-bottom: 1px solid var(--bord); }
-#onglets button { flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
+#onglets button { flex: 1; font-size: 12.5px; background: none; border: none; border-bottom: 2px solid transparent;
                   color: var(--discret); font: inherit; padding: 8px 4px; cursor: pointer; }
 #onglets button:hover { color: var(--texte); }
 #onglets button.actif { color: var(--texte); border-bottom-color: var(--accent); }
@@ -147,6 +147,43 @@ dialog .actions { margin-top: 14px; text-align: center; }
 dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-radius: 6px; font-size: 12.5px; min-height: 2.6em; }
 #dlg-aide pre { font: 12px/1.6 Consolas, Menlo, monospace; white-space: pre-wrap; margin: 0; }
 
+/* ---------- mode Editer, ecoute, legende, tutoriel ---------- */
+#barre-mode { position: absolute; top: 10px; left: 10px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+              background: rgba(27,31,38,.9); border: 1px solid #3a4454; border-radius: 8px; padding: 5px; max-width: calc(100% - 290px); }
+#barre-mode .btn { padding: 3px 8px; font-size: 12px; }
+#barre-mode label { color: var(--discret); font-size: 12px; display: inline-flex; gap: 4px; align-items: center; }
+#barre-mode input[type="number"] { width: 52px; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; }
+#outils-edition { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+#outils-edition[hidden] { display: none; }
+.sep-v { width: 1px; height: 20px; background: #3a4454; margin: 0 3px; }
+.btn.outil.actif { background: #2b5f8a; border-color: var(--accent); }
+.sortie { display: grid; grid-template-columns: 38px minmax(70px, 1fr) 78px 44px 16px 16px; gap: 6px; align-items: center; margin: 4px 0;
+          background: var(--panneau2); border: 1px solid var(--bord); border-radius: 6px; padding: 5px 7px; }
+.sortie .cible { color: var(--discret); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sortie input[type="range"] { width: 100%; }
+.sortie select, .sortie input[type="number"] { width: 100%; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; }
+.sortie button { background: none; border: none; color: var(--discret); cursor: pointer; padding: 0; font-size: 14px; }
+.sortie button.on { color: var(--erreur); }
+#liste-legende { margin: 6px 0; font-size: 12px; }
+#liste-legende dt { font-weight: 600; float: left; width: 58px; clear: left; color: var(--accent); }
+#liste-legende dd { margin: 0 0 4px 62px; color: var(--discret); }
+.reglage .role { grid-column: 1 / -1; margin-top: -3px; font-size: 11px; color: var(--discret); }
+.reglage.instable label { color: var(--erreur); }
+#stabilite.alerte { color: var(--erreur); }
+#tuto { position: absolute; left: 10px; bottom: 34px; width: 340px; background: rgba(30,35,44,.97); border: 1px solid var(--accent);
+        border-radius: 8px; padding: 10px 12px; box-shadow: 0 6px 22px rgba(0,0,0,.5); }
+#tuto h4 { margin: 2px 0 6px; font-size: 14px; }
+#tuto-texte { font-size: 12.5px; line-height: 1.5; }
+#tuto-texte b { color: #ffd166; }
+.actions-tuto { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+.actions-tuto .btn { padding: 3px 8px; font-size: 12px; }
+#tuto.fait #tuto-etape::after { content: "  ✓ fait !"; color: #58d68d; }
+.insp-coords:empty { display: none; }
+.insp-coords { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 4px 0 8px; }
+.insp-coords input { width: 100%; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; font: 12px Consolas, Menlo, monospace; }
+.insp-coords span { grid-column: 1 / -1; font-size: 11px; color: var(--discret); }
+#insp-aide { font-size: 11.5px; color: var(--discret); margin-top: 8px; }
+
 </style>
 </head>
 <body>
@@ -166,6 +203,7 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
   <div class="menu" id="menu-aide">
     <button>Aide</button>
     <div class="menu-liste">
+      <button data-action="tuto">Tutoriel pas à pas</button>
       <button data-action="aide">Prise en main et raccourcis</button>
       <button data-action="budget">Re-mesurer la machine</button>
     </div>
@@ -178,8 +216,9 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
     <nav id="onglets">
       <button data-onglet="construire" class="actif">Construire</button>
       <button data-onglet="reglages">Réglages</button>
+      <button data-onglet="ecoute">Écoute</button>
       <button data-onglet="script">Script</button>
-      <button data-onglet="export">Export Max</button>
+      <button data-onglet="export">Max</button>
     </nav>
 
     <section id="p-construire" class="panneau actif">
@@ -201,16 +240,26 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
     </section>
 
     <section id="p-reglages" class="panneau">
-      <div id="zone-archet" hidden>
-        <h4>Archet</h4>
-        <div class="reglage">
-          <label for="sld-archet">vitesse</label>
-          <input type="range" id="sld-archet" min="-1" max="1" step="0.01" value="0">
-          <span id="val-archet">0</span>
-        </div>
-      </div>
+      <details id="legende-params" open>
+        <summary>Légende des paramètres</summary>
+        <dl id="liste-legende"></dl>
+      </details>
+      <div id="stabilite" class="aide"></div>
       <div id="liste-reglages"></div>
       <p class="aide">Les curseurs agissent pendant que ça joue. Les valeurs sont recopiées dans le script.</p>
+    </section>
+
+    <section id="p-ecoute" class="panneau">
+      <p class="aide">Chaque sortie (posOutput / frcOutput) écoute un point. Choisis plusieurs points dans la vue
+        (Maj+clic ou cadre en mode Éditer) puis « 🎧 Écouter ces points » : ils sont répartis de gauche à droite.
+        Dans Max, chaque sortie devient une sortie <code>outN</code> du gen~.</p>
+      <div class="outils">
+        <label class="case"><input type="radio" name="mode-canaux" value="stereo" checked> stéréo (panoramique)</label>
+        <label class="case"><input type="radio" name="mode-canaux" value="multi"> multicanal</label>
+        <span id="info-canaux" class="discret"></span>
+      </div>
+      <div id="liste-sorties"></div>
+      <button class="btn" id="btn-ecouter-sel">🎧 Écouter les points sélectionnés</button>
     </section>
 
     <section id="p-script" class="panneau">
@@ -254,10 +303,42 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
   <div id="droite">
     <div id="zone-canvas">
       <canvas id="vue3d"></canvas>
+      <div id="barre-mode">
+        <button class="btn actif" id="btn-mode-jeu" title="Jouer : attraper les billes, frapper (Tab pour changer)">▶ Jouer</button>
+        <button class="btn" id="btn-mode-edit" title="Éditer : placer, déplacer, relier, tracer (Tab pour changer)">✎ Éditer</button>
+        <span id="outils-edition" hidden>
+          <span class="sep-v"></span>
+          <button class="btn outil actif" data-outil="selection" title="Sélection / déplacement (V)">↖</button>
+          <button class="btn outil" data-outil="mass" title="Poser une masse libre (M)">● masse</button>
+          <button class="btn outil" data-outil="osc" title="Poser un oscillateur (O)">◉ osc</button>
+          <button class="btn outil" data-outil="ground" title="Poser un point fixe (F)">■ fixe</button>
+          <button class="btn outil" data-outil="relier" title="Relier deux points par un ressort (L) — Maj pour enchaîner">╱ relier</button>
+          <button class="btn outil" data-outil="corde" title="Tracer une corde intégrée : glisser (C)">〰 corde</button>
+          <button class="btn outil" data-outil="membrane" title="Tracer une membrane intégrée : glisser un rectangle (B)">▦ membrane</button>
+          <span class="sep-v"></span>
+          <label title="hauteur du plan de travail où l'on pose les points">plan z <input type="number" id="plan-z" value="4" step="0.5"></label>
+          <label title="magnétisme : arrondit les positions à la grille"><input type="checkbox" id="chk-grille" checked> grille</label>
+          <button class="btn" id="btn-annuler" title="Annuler (Ctrl+Z)">↶</button>
+          <button class="btn" id="btn-refaire" title="Refaire (Ctrl+Maj+Z)">↷</button>
+        </span>
+      </div>
+      <div id="tuto" hidden>
+        <div id="tuto-etape" class="discret"></div>
+        <h4 id="tuto-titre"></h4>
+        <div id="tuto-texte"></div>
+        <div class="actions-tuto">
+          <button class="btn" id="tuto-faire">Le faire pour moi</button>
+          <button class="btn" id="tuto-prec">◀</button>
+          <button class="btn" id="tuto-suiv">Suivant ▶</button>
+          <button class="btn" id="tuto-fermer">✕</button>
+        </div>
+      </div>
       <div id="inspecteur" hidden>
         <div id="insp-titre"></div>
         <div id="insp-sous" class="discret"></div>
+        <div id="insp-coords" class="insp-coords"></div>
         <div id="insp-actions"></div>
+        <div id="insp-aide"></div>
       </div>
       <div id="legende">
         <span><i class="pt" style="background:#5aa9e6"></i>masse</span>
@@ -271,7 +352,13 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
       <button class="btn" id="btn-anim" title="Animer la simulation (sans son)">▶ Animer</button>
       <button class="btn" id="btn-son" title="Son temps réel : un pas de calcul par échantillon audio">🔈 Son</button>
       <button class="btn" id="btn-frapper" title="Frapper (espace)">⚡ Frapper</button>
-      <button class="btn" id="btn-reset">⟲</button>
+      <button class="btn" id="btn-reset" title="Remettre le modèle au repos">⟲</button>
+      <button class="btn" id="btn-secours" title="Le modèle a explosé ? Revient aux derniers réglages stables et remet au repos">🛟 Secours</button>
+      <span id="zone-archet" hidden>
+        <label title="vitesse de l'archet : 0 = immobile, + ou − = frotte dans un sens ou l'autre">🎻 archet
+          <input type="range" id="sld-archet" min="-1" max="1" step="0.01" value="0"></label>
+        <span id="val-archet">0</span>
+      </span>
       <label>force <input type="range" id="sld-force" min="0.01" max="1" step="0.01" value="0.3"></label>
       <label>volume <input type="range" id="sld-volume" min="-30" max="30" step="1" value="0"></label>
       <label title="ramène automatiquement le niveau vers un volume confortable"><input type="checkbox" id="chk-autovol" checked> auto</label>
@@ -344,9 +431,27 @@ JOUER
   Réglages : tous les @param en curseurs, actifs pendant le jeu.
   ▶ Animer : simulation visuelle sans son (curseur vitesse).
 
-VUE 3D
+VUE 3D (mode Jouer)
   glisser : orbiter      molette : zoom      clic droit : déplacer
-  double-clic : recadrer clic : sélectionner Maj+clic : 2e point
+  double-clic : recadrer clic : sélectionner Maj+clic : ajouter
+
+ÉDITER (Tab ou ✎ Éditer)
+  V sélection : clic, Maj+clic, cadre ; flèches X Y Z ou glisser un
+    point = déplacer (grille 0,5) ; flèches clavier, PgUp/PgDn = hauteur
+  M masse · O oscillateur · F point fixe : clic sur le plan de travail
+  L relier : clic sur 2 points (Maj = enchaîner)
+  C corde · B membrane : glisser sur le plan de travail
+  plan z : hauteur du plan de travail   Suppr : effacer
+  Ctrl+Z / Ctrl+Maj+Z : annuler / refaire   clic droit : tourner
+
+ÉCOUTE
+  plusieurs points (Maj+clic) → « Écouter ces points » : stéréo répartie
+  onglet Écoute : panoramique, gain, muet, ou un canal par sortie
+
+SECOURS
+  la jauge « stabilité » (Réglages) prévient avant l'explosion ;
+  si ça explose, retour automatique aux derniers réglages stables
+  (ou bouton 🛟 Secours)
 
 BUDGET
   La jauge en bas indique la charge du son sur un coeur de ta machine
@@ -2593,6 +2698,7 @@ function nouveauModele() {
     erreurs: [],              // [ligne, message]
     avertissements: [],
     legacy: false,            // ancien dialecte (positions 3D dans la ligne de masse)
+    routage: new Map(),       // ~sortie @outN pan p gain dB canal c muet : nom -> reglages
   };
 }
 
@@ -2657,6 +2763,16 @@ function parse(texte) {
       const v = p.slice(2).map(Number);
       if (v.some(Number.isNaN)) { err(num, "~pos : coordonnees non numeriques"); return; }
       geo.set(p[1].slice(1), v);
+      return;
+    }
+    if (p[0] === "~sortie") {                    // routage d'une sortie (studio seulement)
+      if (p.length < 2 || !/^@/.test(p[1])) { err(num, "~sortie : attendu ~sortie @outN pan p gain dB canal c"); return; }
+      const r = { pan: null, gain: 0, canal: null, muet: false };
+      for (let k = 2; k < p.length; k++) {
+        if (p[k] === "muet") r.muet = true;
+        else if (["pan", "gain", "canal"].includes(p[k]) && k + 1 < p.length) { r[p[k]] = Number(p[k + 1]); k++; }
+      }
+      mdl.routage.set(p[1].slice(1), r);
       return;
     }
     if (p[0] === "~place") {
@@ -3028,7 +3144,14 @@ function compiler(mdl, options = {}) {
     liens.push({ code: CODES_INTER.indexOf(it.genre), i1, i2, args, nom: it.nom });
   }
   const entrees = mdl.entrees.map(e => ({ nom: e.nom, i: resout(e.cible) }));
-  const sorties = mdl.sorties.map(s => ({ nom: s.nom, genre: s.genre, i: resout(s.cible) }));
+  // routage : pan (stereo) reparti de gauche a droite par defaut, gain en dB, canal (multicanal)
+  const sorties = mdl.sorties.map((s, k, tout) => {
+    const r = mdl.routage.get(s.nom) || {};
+    const panDefaut = tout.length > 1 ? -1 + 2 * k / (tout.length - 1) : 0;
+    return { nom: s.nom, genre: s.genre, i: resout(s.cible),
+             pan: r.pan === null || r.pan === undefined ? panDefaut : Math.min(Math.max(r.pan, -1), 1),
+             gain: r.gain || 0, canal: r.canal || k + 1, muet: !!r.muet };
+  });
 
   // hauteur affichee d'un point (proxy = interpolee)
   const hauteur = i => i < nbNoeuds ? N.gz[i]
@@ -3241,7 +3364,9 @@ class Simulateur {
     for (let i = 0; i < n; i++) {
       const e = etat[i];
       if (e === MOBILE) {
-        const un = A[i] * u[i] + B[i] * ur[i] + (f[i] - grav[i]) * invM[i];
+        // (+1e-18 -1e-18) ramene a 0 les valeurs infimes : sans ca, quand le son
+        // s'eteint, le processeur passe en nombres "denormaux", jusqu'a 100x plus lents
+        const un = (A[i] * u[i] + B[i] * ur[i] + (f[i] - grav[i]) * invM[i] + 1e-18) - 1e-18;
         ur[i] = u[i]; u[i] = un;
       } else if (e === ENTREE) {
         cible[i] += this.vitesse[i];
@@ -3340,13 +3465,59 @@ const SOURCE_MOTEUR = () => [
   Simulateur.toString(),
 ].join("\n");
 
+/* Marge de stabilite (schema saute-mouton) : pour une masse seule,
+ * le calcul reste stable tant que (K + 2 Z) / M < 4. Pour un reseau, on
+ * borne K et Z par la somme des liaisons (Gershgorin) : 2x pour une
+ * liaison vers une masse mobile, 1x vers un point fixe. Contacts compris
+ * (quand ils touchent). Renvoie le pire rapport (< 1 = stable) et le point. */
+function margeStabilite(desc) {
+  const n = desc.nbNoeuds, K = new Float64Array(n), Z = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    if (desc.etat[i] !== MOBILE) continue;
+    const M = 1 / desc.invM[i];                       // osc : A = 2-(K+Z)/M, B = Z/M-1
+    Z[i] = (desc.B[i] + 1) * M;
+    K[i] = (2 - desc.A[i]) * M - Z[i];
+  }
+  const ajoute = (i, k, z, poids, autreMobile) => {
+    const f = autreMobile ? 2 : 1;
+    if (i < n) { if (desc.etat[i] === MOBILE) { K[i] += f * k; Z[i] += f * z; } return; }
+    const p = desc.proxies[i - n];
+    p.noeuds.forEach((m, j) => { if (desc.etat[m] === MOBILE) { K[m] += f * k * p.poids[j]; Z[m] += f * z * p.poids[j]; } });
+  };
+  const mobile = i => i >= n || desc.etat[i] === MOBILE;
+  for (const l of desc.liens) {
+    let k = 0, z = 0;
+    const a = l.args;
+    switch (l.code) {
+      case 0: k = a[0]; break;
+      case 1: z = a[0]; break;
+      case 2: case 3: k = a[0]; z = a[1] || 0; break;
+      case 4: case 5: k = Math.max(a[0], a[2] || 0); z = a[3] || 0; break;
+      case 6: case 7: k = a[0]; z = a[2] || 0; break;
+      case 8: k = a[0]; z = a[2] || 0; break;
+      case 9: z = a[0]; break;
+    }
+    k = Math.abs(k || 0); z = Math.abs(z || 0);
+    ajoute(l.i1, k, z, 1, mobile(l.i2));
+    ajoute(l.i2, k, z, 1, mobile(l.i1));
+  }
+  let pire = 0, ou = -1;
+  for (let i = 0; i < n; i++) {
+    if (desc.etat[i] !== MOBILE) continue;
+    const r = (K[i] + 2 * Z[i]) * desc.invM[i] / 4;
+    if (r > pire) { pire = r; ou = i; }
+  }
+  return { rapport: pire, noeud: ou };
+}
+
 
 /* ===== 20-son.js ===== */
 "use strict";
 /* ------------------------------------------------------------------ *
  *  Son temps reel : un pas de calcul par echantillon audio (comme     *
- *  gen~). Sorties posOutput / frcOutput : 1re a gauche, 2e a droite,  *
- *  etc. Calcul dans un AudioWorklet, ScriptProcessor en secours.      *
+ *  gen~). Sorties posOutput / frcOutput placees en stereo (pan) ou    *
+ *  sur des canaux separes (multicanal). AudioWorklet, ou              *
+ *  ScriptProcessor en secours.                                        *
  * ------------------------------------------------------------------ */
 
 class NoyauSon {
@@ -3360,8 +3531,12 @@ class NoyauSon {
     this.relache = Math.exp(-1 / (sampleRate * 4));
     this.periode = Math.round(sampleRate / 30);    // ~30 images / s vers la vue
     this.compteur = 0;
-    this.dc = new Float64Array(4);                 // filtres anti-continu L/R
+    this.nCanaux = 2;
+    this.multi = false;                            // stereo (pan) ou multicanal (canal)
+    this.dc = new Float64Array(2 * 32);            // filtres anti-continu par canal
+    this.mix = new Float64Array(32);
     this.charge = 0;                               // part du temps reel utilisee
+    this.routes = [];                              // [{i, frc, gains[canal]}]
   }
 
   message(d) {
@@ -3370,57 +3545,80 @@ class NoyauSon {
         const ancien = this.sim;
         this.sim = d.desc ? new Simulateur(d.desc) : null;
         if (!(d.garder && this.sim && this.sim.adopter(ancien))) { this.dc.fill(0); this.env = 0; }
-        this._choisitVoies();
+        this._routage();
         break;
       }
+      case "routage":                               // pan / gain / canal / muet, sans recompiler
+        if (this.sim) d.sorties.forEach((r, k) => { if (this.sim.sorties[k]) Object.assign(this.sim.sorties[k], r); });
+        this._routage();
+        break;
+      case "canaux": this.nCanaux = d.n; this.multi = d.multi; this.dc.fill(0); this._routage(); break;
       case "frapper": if (this.sim) this.sim.frapper(d.i, d.force); break;
       case "pousser": if (this.sim) this.sim.pousser(d.force, Math.round(this.sr / 1000)); break;
       case "placer": if (this.sim) this.sim.placer(d.i, d.u); break;
       case "entrainer": if (this.sim) this.sim.entrainer(d.i, d.v); break;
-      case "reset": if (this.sim) this.sim.reset(); break;
+      case "reset": if (this.sim) this.sim.reset(); this.dc.fill(0); this.env = 0; break;
       case "gain": this.gain = d.v; this.auto = d.auto !== false; break;
     }
   }
 
-  /* Sans posOutput dans le script, on ecoute deux masses mobiles. */
-  _choisitVoies() {
-    this.secours = null;
-    const s = this.sim;
-    if (!s || s.sorties.length) return;
-    const mob = [];
-    for (let i = 0; i < s.n; i++) if (s.etat[i] === MOBILE) mob.push(i);
-    if (mob.length) this.secours = [mob[Math.floor(mob.length / 3)], mob[Math.floor(2 * mob.length / 3)]];
+  /* gains de chaque sortie vers chaque canal. Stereo : pan a puissance
+   * constante. Multicanal : la sortie va sur son canal. Sans posOutput,
+   * on ecoute deux masses de l'objet. */
+  _routage() {
+    const s = this.sim, C = this.nCanaux;
+    this.routes = [];
+    if (!s) return;
+    let sorties = s.sorties.map(o => ({ i: o.i, frc: o.genre === "frcOutput", pan: o.pan, gain: o.gain, canal: o.canal, muet: o.muet }));
+    if (!sorties.length) {
+      const mob = [];
+      for (let i = 0; i < s.n; i++) if (s.etat[i] === MOBILE) mob.push(i);
+      if (mob.length) sorties = [
+        { i: mob[Math.floor(mob.length / 3)], frc: false, pan: -1, gain: 0, canal: 1, muet: false },
+        { i: mob[Math.floor(2 * mob.length / 3)], frc: false, pan: 1, gain: 0, canal: 2, muet: false }];
+    }
+    for (const o of sorties) {
+      const g = o.muet ? 0 : Math.pow(10, (o.gain || 0) / 20), gains = new Float64Array(C);
+      if (this.multi) gains[((o.canal || 1) - 1) % C] = g;
+      else if (C === 1) gains[0] = g;
+      else {
+        const a = (Math.min(Math.max(o.pan, -1), 1) + 1) * Math.PI / 4;
+        gains[0] = g * Math.cos(a); gains[1] = g * Math.sin(a);
+      }
+      this.routes.push({ i: o.i, frc: o.frc, gains });
+    }
   }
 
-  remplir(L, R) {
-    const s = this.sim;
-    if (!s) { L.fill(0); if (R !== L) R.fill(0); return; }
+  remplir(canaux) {
+    const s = this.sim, C = Math.min(canaux.length, this.nCanaux), N = canaux[0].length;
+    if (!s) { for (const c of canaux) c.fill(0); return; }
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const ns = s.sorties.length, g = this.gain, dc = this.dc, u = s.u, sec = this.secours;
-    for (let k = 0; k < L.length; k++) {
+    const g = this.gain, dc = this.dc, mix = this.mix, routes = this.routes, u = s.u, f = s.f;
+    for (let k = 0; k < N; k++) {
       s._unPas();
-      let l = 0, r = 0;
-      if (ns) {
-        for (let j = 0; j < ns; j++) { const v = s.sortie(j); if (j % 2 === 0) l += v; else r += v; }
-        if (ns === 1) r = l;
-      } else if (sec) { l = u[sec[0]]; r = u[sec[1]]; }
-      // filtre anti-continu, puis limiteur doux
-      const yl = l - dc[0] + 0.995 * dc[1]; dc[0] = l; dc[1] = yl;
-      const yr = r - dc[2] + 0.995 * dc[3]; dc[2] = r; dc[3] = yr;
-      // volume auto : crete suivie (montee immediate, descente ~4 s) ramenee vers 0.35
-      const a = Math.max(Math.abs(yl), Math.abs(yr));
+      for (let c = 0; c < C; c++) mix[c] = 0;
+      for (let r = 0; r < routes.length; r++) {
+        const R = routes[r], v = R.frc ? f[R.i] : u[R.i];
+        for (let c = 0; c < C; c++) mix[c] += v * R.gains[c];
+      }
+      // filtre anti-continu par canal, puis volume auto et limiteur doux
+      let a = 0;
+      for (let c = 0; c < C; c++) {
+        const y = mix[c] - dc[2 * c] + 0.995 * dc[2 * c + 1];
+        dc[2 * c] = mix[c]; dc[2 * c + 1] = y; mix[c] = y;
+        a = Math.max(a, Math.abs(y));
+      }
       this.env = a > this.env ? a : this.env * this.relache;
       const ga = this.auto ? g * 0.35 / Math.max(this.env, 1e-4) : g * 4;
-      L[k] = Math.tanh(yl * ga);
-      if (R !== L) R[k] = Math.tanh(yr * ga);
+      for (let c = 0; c < C; c++) canaux[c][k] = Math.tanh(mix[c] * ga);
     }
+    for (let c = C; c < canaux.length; c++) canaux[c].fill(0);
     const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const dispo = 1000 * L.length / this.sr;
-    this.charge = 0.97 * this.charge + 0.03 * ((t1 - t0) / dispo);
-    this.compteur += L.length;
+    this.charge = 0.97 * this.charge + 0.03 * ((t1 - t0) / (1000 * N / this.sr));
+    this.compteur += N;
     if (this.compteur >= this.periode) {
       this.compteur = 0;
-      if (!s.sain()) this.poster({ type: "explosion" });
+      if (!s.sain()) { this.dc.fill(0); this.env = 0; this.poster({ type: "explosion" }); }
       this.poster({ type: "etat", u: s.u.slice(), charge: this.charge });
     }
   }
@@ -3459,8 +3657,7 @@ class MimsProcesseur extends AudioWorkletProcessor {
     this.port.onmessage = e => this.noyau.message(e.data);
   }
   process(entrees, sorties) {
-    const o = sorties[0];
-    this.noyau.remplir(o[0], o[1] || o[0]);
+    this.noyau.remplir(sorties[0]);
     return true;
   }
 }
@@ -3475,25 +3672,56 @@ registerProcessor("mims-son", MimsProcesseur);`;
         } finally {
           URL.revokeObjectURL(url);
         }
-        this.noeud = new AudioWorkletNode(this.ctx, "mims-son",
-          { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
-        this.noeud.port.onmessage = e => recoit(e.data);
-        this.noeud.connect(this.ctx.destination);
         this.mode = "worklet";
+        this._creeNoeud();
         return;
       } catch (exc) {
         console.warn("AudioWorklet indisponible, mode secours :", exc);
       }
     }
     // secours : calcul dans le fil principal (moins stable si la page est chargee)
-    this.noyau = new NoyauSon(this.ctx.sampleRate, recoit);
-    this.noeud = this.ctx.createScriptProcessor(1024, 0, 2);
-    this.noeud.onaudioprocess = e => {
-      const b = e.outputBuffer;
-      this.noyau.remplir(b.getChannelData(0), b.getChannelData(1));
-    };
-    this.noeud.connect(this.ctx.destination);
     this.mode = "secours";
+    this.noyau = new NoyauSon(this.ctx.sampleRate, recoit);
+    this._creeNoeud();
+  },
+
+  nCanaux: 2,
+  multi: false,
+
+  /* (re)cree le noeud de sortie avec le bon nombre de canaux */
+  _creeNoeud() {
+    const recoit = d => { if (this.surMessage) this.surMessage(d); };
+    if (this.noeud) this.noeud.disconnect();
+    if (this.multi) this.nCanaux = Math.min(this.nCanaux, this.maxCanaux);
+    const n = this.nCanaux, dest = this.ctx.destination;
+    try { dest.channelCount = Math.max(2, n); dest.channelInterpretation = n > 2 ? "discrete" : "speakers"; }
+    catch (e) { /* certains navigateurs refusent : on garde la stereo */ }
+    if (this.mode === "worklet") {
+      this.noeud = new AudioWorkletNode(this.ctx, "mims-son",
+        { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [n],
+          channelCount: n, channelCountMode: "explicit", channelInterpretation: "discrete" });
+      this.noeud.port.onmessage = e => recoit(e.data);
+    } else {
+      this.noeud = this.ctx.createScriptProcessor(1024, 0, n);
+      this.noeud.onaudioprocess = e => {
+        const b = e.outputBuffer, c = [];
+        for (let k = 0; k < b.numberOfChannels; k++) c.push(b.getChannelData(k));
+        this.noyau.remplir(c);
+      };
+    }
+    this.noeud.connect(dest);
+    this.envoyer({ type: "canaux", n, multi: this.multi });
+  },
+
+  /* nombre de canaux de la carte son (2 si inconnu) */
+  get maxCanaux() { return this.ctx ? Math.max(2, this.ctx.destination.maxChannelCount || 2) : 2; },
+
+  /* stereo (pan) ou multicanal (une sortie par canal) ; renvoie le nombre de canaux */
+  configurerCanaux(multi, n) {
+    this.multi = multi;
+    this.nCanaux = multi ? Math.min(Math.max(n, 1), 32) : 2;
+    if (this.ctx) this._creeNoeud();
+    return this.nCanaux;
   },
 
   envoyer(d) {
@@ -4768,8 +4996,15 @@ class Vue3D {
 
     this.desc = null;
     this.pos = new Float64Array(0);      // x y z par point (noeuds puis proxies)
-    this.selection = -1;
-    this.selection2 = -1;
+    this.selection = -1;                 // point principal (dernier clique)
+    this.selection2 = -1;                // 2e point quand exactement deux sont choisis
+    this.multi = new Set();              // tous les points selectionnes
+    this.edition = false;                // mode Editer
+    this.outil = "selection";            // selection | mass | osc | ground | relier | corde | membrane
+    this.planZ = 4;                      // hauteur du plan de travail
+    this.pas = 0.5;                      // magnetisme (0 = libre)
+    this._apercu = null;                 // trace en cours (corde, membrane, cadre)
+    this._relierDepuis = -1;
     this._plancher = new Set();
     this._drag = null;
     this._demandeDessin = false;
@@ -4821,9 +5056,12 @@ class Vue3D {
       this._entreesForce = new Set(desc.entrees.map(e => e.i));
       this._plancher = new Set(desc.plancher || []);
     }
-    if (!ancien || !desc || this.selection >= T || ancien.noms[this.selection] !== (desc.noms[this.selection]))
-      this.selection = -1;
-    if (this.selection2 >= T) this.selection2 = -1;
+    // garde la selection si les points existent toujours (memes noms)
+    const garde = i => ancien && desc && i < T && ancien.noms[i] === desc.noms[i];
+    this.multi = new Set([...this.multi].filter(garde));
+    if (!garde(this.selection)) this.selection = this.multi.size ? [...this.multi].pop() : -1;
+    this._majSelection2();
+    if (!garde(this._relierDepuis)) this._relierDepuis = -1;
     if (garderVue) this.redessiner(); else this.recadrer();
   }
 
@@ -4975,15 +5213,26 @@ class Vue3D {
         ctx.beginPath(); ctx.moveTo(px, py - r - 9); ctx.lineTo(px, py - r - 2);
         ctx.moveTo(px - 3, py - r - 5); ctx.lineTo(px, py - r - 2); ctx.lineTo(px + 3, py - r - 5); ctx.stroke();
       }
-      if (i === this.selection || i === this.selection2) {
+      if (this.multi.has(i) || i === this._relierDepuis) {
         ctx.strokeStyle = i === this.selection ? COULEURS.selection : COULEURS.selection2; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(px, py, r + 5, 0, TAU); ctx.stroke();
       }
     }
+    if (this.edition) this._dessineEdition();
   }
 
   _grille() {
     const ctx = this.ctx, L = 20, pas = 5;
+    if (this.edition && Math.abs(this.planZ) > 1e-6) {          // plan de travail
+      ctx.strokeStyle = "#1f3a4d"; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let i = -L; i <= L; i += pas / 2)
+        for (const [a, b] of [[[i, -L, this.planZ], [i, L, this.planZ]], [[-L, i, this.planZ], [L, i, this.planZ]]]) {
+          const [x1, y1] = this._projette(...a), [x2, y2] = this._projette(...b);
+          ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+        }
+      ctx.stroke();
+    }
     ctx.strokeStyle = COULEURS.grille; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath();
     for (let i = -L; i <= L; i += pas)
@@ -4999,6 +5248,138 @@ class Vue3D {
     }
   }
 
+  /* ---------------- selection ---------------- */
+
+  _majSelection2() {
+    this.selection2 = -1;
+    if (this.multi.size === 2) for (const i of this.multi) if (i !== this.selection) this.selection2 = i;
+  }
+
+  choisir(i, ajouter = false) {
+    if (i < 0) { if (!ajouter) { this.multi.clear(); this.selection = -1; } }
+    else if (ajouter && this.multi.has(i)) {
+      this.multi.delete(i);
+      if (this.selection === i) this.selection = this.multi.size ? [...this.multi].pop() : -1;
+    } else {
+      if (!ajouter) this.multi.clear();
+      this.multi.add(i); this.selection = i;
+    }
+    this._majSelection2();
+    if (this.rappels.surSelection) this.rappels.surSelection();
+    this.redessiner();
+  }
+
+  /* points deplacables : pas les proxies ni le sol ; un point de structure
+   * integree entraine toute la structure */
+  _aDeplacer(indices) {
+    const d = this.desc, res = new Set();
+    for (const i of indices) {
+      if (i >= d.nbNoeuds || this._plancher.has(i)) continue;
+      if (d.element[i] !== d.noms[i]) {
+        const mc = d.macros.find(m => m.nom === d.element[i]);
+        for (let k = 0; k < mc.nx * mc.ny; k++) res.add(mc.debut + k);
+      } else res.add(i);
+    }
+    return [...res];
+  }
+
+  /* ---------------- geometrie ecran <-> monde ---------------- */
+
+  /* point du plan horizontal z = h sous le pointeur (Newton sur la projection) */
+  surPlan(sx, sy, h) {
+    let x = this.cible[0], y = this.cible[1];
+    for (let it = 0; it < 8; it++) {
+      const [px, py] = this._projette(x, y, h);
+      const e = 1e-3;
+      const [ax, ay] = this._projette(x + e, y, h), [bx, by] = this._projette(x, y + e, h);
+      const j11 = (ax - px) / e, j21 = (ay - py) / e, j12 = (bx - px) / e, j22 = (by - py) / e;
+      const det = j11 * j22 - j12 * j21;
+      if (Math.abs(det) < 1e-9) break;
+      const rx = sx - px, ry = sy - py;
+      x += (j22 * rx - j12 * ry) / det;
+      y += (-j21 * rx + j11 * ry) / det;
+    }
+    const s = v => this.pas > 0 ? Math.round(v / this.pas) * this.pas : v;
+    return [s(x), s(y), h];
+  }
+
+  _centre(indices) {
+    const c = [0, 0, 0];
+    for (const i of indices) for (let k = 0; k < 3; k++) c[k] += this.pos[3 * i + k];
+    return c.map(v => v / Math.max(indices.length, 1));
+  }
+
+  /* poignees de deplacement : origine, extremites des fleches X Y Z */
+  _gizmo() {
+    if (!this.edition || this.outil !== "selection" || !this.desc) return null;
+    const ids = this._aDeplacer(this.multi);
+    if (!ids.length) return null;
+    const c = this._centre(ids);
+    const [ox, oy] = this._projette(...c);
+    const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(e => {
+      const [px, py] = this._projette(c[0] + e[0], c[1] + e[1], c[2] + e[2]);
+      const parUnite = Math.hypot(px - ox, py - oy) || 1e-3;
+      const L = 70 / parUnite;
+      const [ex, ey] = this._projette(c[0] + e[0] * L, c[1] + e[1] * L, c[2] + e[2] * L);
+      return { ex, ey, ux: (px - ox) / parUnite, uy: (py - oy) / parUnite, parUnite, vx: px - ox, vy: py - oy };
+    });
+    return { c, ox, oy, axes, ids };
+  }
+
+  _toucheGizmo(x, y) {
+    const g = this._gizmo();
+    if (!g) return null;
+    if (Math.abs(x - g.ox) < 9 && Math.abs(y - g.oy) < 9) return { g, axe: -1 };
+    for (let k = 0; k < 3; k++) {
+      const a = g.axes[k], dx = a.ex - g.ox, dy = a.ey - g.oy, L2 = dx * dx + dy * dy || 1;
+      const t = Math.min(Math.max(((x - g.ox) * dx + (y - g.oy) * dy) / L2, 0), 1);
+      if (t > 0.15 && Math.hypot(x - g.ox - t * dx, y - g.oy - t * dy) < 7) return { g, axe: k };
+    }
+    return null;
+  }
+
+  _dessineEdition() {
+    const ctx = this.ctx;
+    const g = this._gizmo();
+    if (g) {
+      const coul = ["#e05555", "#58d68d", "#5aa9e6"], noms = ["X", "Y", "Z"];
+      g.axes.forEach((a, k) => {
+        ctx.strokeStyle = coul[k]; ctx.fillStyle = coul[k]; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(g.ox, g.oy); ctx.lineTo(a.ex, a.ey); ctx.stroke();
+        const ang = Math.atan2(a.ey - g.oy, a.ex - g.ox);
+        ctx.beginPath(); ctx.moveTo(a.ex + 8 * Math.cos(ang), a.ey + 8 * Math.sin(ang));
+        ctx.lineTo(a.ex + 6 * Math.cos(ang + 2.3), a.ey + 6 * Math.sin(ang + 2.3));
+        ctx.lineTo(a.ex + 6 * Math.cos(ang - 2.3), a.ey + 6 * Math.sin(ang - 2.3)); ctx.fill();
+        ctx.font = "bold 11px sans-serif"; ctx.fillText(noms[k], a.ex + 10 * Math.cos(ang) - 4, a.ey + 10 * Math.sin(ang) + 4);
+      });
+      ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.fillRect(g.ox - 6, g.oy - 6, 12, 12);
+    }
+    const ap = this._apercu;
+    if (ap) {
+      ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      if (ap.type === "cadre") ctx.rect(ap.x0, ap.y0, ap.x1 - ap.x0, ap.y1 - ap.y0);
+      else if (ap.type === "corde" || ap.type === "lien") {
+        const [ax, ay] = this._projette(...ap.p0), [bx, by] = this._projette(...ap.p1);
+        ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      } else if (ap.type === "membrane") {
+        const c = [[ap.p0[0], ap.p0[1]], [ap.p1[0], ap.p0[1]], [ap.p1[0], ap.p1[1]], [ap.p0[0], ap.p1[1]]]
+          .map(([x, y]) => this._projette(x, y, ap.p0[2]));
+        ctx.moveTo(c[0][0], c[0][1]); for (const q of c.slice(1)) ctx.lineTo(q[0], q[1]); ctx.closePath();
+      } else if (ap.type === "point") {
+        const [px, py] = this._projette(...ap.p0);
+        ctx.setLineDash([]); ctx.arc(px, py, 6, 0, TAU);
+        const [qx, qy] = this._projette(ap.p0[0], ap.p0[1], 0);
+        ctx.moveTo(px, py); ctx.lineTo(qx, qy);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      if (ap.texte) {
+        ctx.fillStyle = "#ffd166"; ctx.font = "12px sans-serif";
+        ctx.fillText(ap.texte, ap.tx + 12, ap.ty - 10);
+      }
+    }
+  }
+
   /* ---------------- souris ---------------- */
 
   _xy(e) {
@@ -5011,7 +5392,7 @@ class Vue3D {
     const P = this._projetteTout();
     let best = -1, dmin = rayon;
     for (let i = 0; i < P.length / 4; i++) {
-      if ((filtre && !filtre(i)) || (this._plancher && this._plancher.has(i))) continue;
+      if ((filtre && !filtre(i)) || this._plancher.has(i)) continue;
       const dd = Math.hypot(P[4 * i] - ex, P[4 * i + 1] - ey);
       if (dd < dmin) { best = i; dmin = dd; }
     }
@@ -5021,36 +5402,87 @@ class Vue3D {
   _pointerDown(e) {
     const [x, y] = this._xy(e);
     this.canvas.setPointerCapture(e.pointerId);
-    const d = this.desc;
-    const bille = e.button === 0 && d ? this._plusProche(x, y, i => i < d.nbNoeuds && d.etat[i] === ENTREE, 14) : -1;
-    if (bille >= 0) {
-      this.selection = bille;
-      const s = this._projette(...this.pos.subarray(3 * bille, 3 * bille + 3))[3];
-      const echelle = Math.max(this.zoom * s * Math.cos(this.pitch), 1e-3);
-      this._drag = ["bille", y, this.pos[3 * bille + 2], bille, echelle];
-      if (this.rappels.surSelection) this.rappels.surSelection(bille, this.selection2);
-      this.canvas.style.cursor = "ns-resize";
-    } else if (e.button === 0) this._drag = ["maybe", x, y, e.shiftKey];
-    else this._drag = ["pan", x, y];
     e.preventDefault();
+    const d = this.desc;
+    // orbite / deplacement de la vue : clic droit (Maj = deplacer), milieu = deplacer
+    if (e.button === 1 || (e.button === 2 && (e.shiftKey || !this.edition))) { this._drag = ["pan", x, y]; return; }
+    if (e.button === 2 || (e.button === 0 && e.altKey)) { this._drag = ["orbit", x, y]; return; }
+    if (e.button !== 0) return;
+
+    if (!this.edition) {                                   // mode Jouer
+      const bille = d ? this._plusProche(x, y, i => i < d.nbNoeuds && d.etat[i] === ENTREE, 14) : -1;
+      if (bille >= 0) {
+        this.choisir(bille);
+        const s = this._projette(...this.pos.subarray(3 * bille, 3 * bille + 3))[3];
+        const echelle = Math.max(this.zoom * s * Math.cos(this.pitch), 1e-3);
+        this._drag = ["bille", y, this.pos[3 * bille + 2], bille, echelle];
+        this.canvas.style.cursor = "ns-resize";
+      } else this._drag = ["maybe", x, y, e.shiftKey];
+      return;
+    }
+
+    // mode Editer
+    if (this.outil === "selection") {
+      const t = this._toucheGizmo(x, y);
+      if (t) { this._debutDeplacement(t.g.ids, t.axe, x, y, t.g); return; }
+      const i = this._plusProche(x, y, null, 10);
+      if (i >= 0) {
+        if (!this.multi.has(i) || e.shiftKey) this.choisir(i, e.shiftKey);
+        const g = this._gizmo();
+        if (g) this._drag = ["attente-plan", x, y, g];
+        return;
+      }
+      this._drag = ["cadre", x, y, e.shiftKey];
+      return;
+    }
+    if (this.outil === "relier") {
+      const i = this._plusProche(x, y, null, 12);
+      if (i < 0) { this._relierDepuis = -1; this.redessiner(); return; }
+      if (this._relierDepuis < 0 || this._relierDepuis === i) { this._relierDepuis = i; this.redessiner(); return; }
+      const a = this._relierDepuis;
+      this._relierDepuis = e.shiftKey ? i : -1;
+      if (this.rappels.surRelier) this.rappels.surRelier(a, i);
+      return;
+    }
+    const p0 = this.surPlan(x, y, this.planZ);
+    if (this.outil === "corde" || this.outil === "membrane") { this._drag = ["trace", x, y, p0]; return; }
+    if (this.rappels.surCreation) this.rappels.surCreation(this.outil, p0, null);   // poser un point
+  }
+
+  _debutDeplacement(ids, axe, x, y, g) {
+    this._posDepart = this.pos.slice();
+    this._drag = ["deplace", x, y, ids, axe, g, [0, 0, 0]];
   }
 
   _pointerMove(e) {
+    const [x, y] = this._xy(e);
     if (this._drag === null) {
-      if (this.desc && e.pointerType === "mouse") {
-        const [x, y] = this._xy(e);
-        const d = this.desc;
+      if (!this.desc || e.pointerType !== "mouse") return;
+      const d = this.desc;
+      if (this.edition && ["mass", "osc", "ground", "corde", "membrane"].includes(this.outil)) {
+        const p = this.surPlan(x, y, this.planZ);
+        this._apercu = { type: "point", p0: p, texte: `${p[0].toFixed(1)}, ${p[1].toFixed(1)}, z ${p[2].toFixed(1)}`, tx: x, ty: y };
+        this.canvas.style.cursor = "crosshair";
+        this.redessiner();
+      } else if (this.edition && this.outil === "relier" && this._relierDepuis >= 0) {
+        const i = this._plusProche(x, y, null, 12);
+        const a = this.pos.subarray(3 * this._relierDepuis, 3 * this._relierDepuis + 3);
+        const b = i >= 0 ? this.pos.subarray(3 * i, 3 * i + 3) : this.surPlan(x, y, a[2]);
+        this._apercu = { type: "lien", p0: [...a], p1: [...b] };
+        this.redessiner();
+      } else if (this.edition && this.outil === "selection") {
+        this.canvas.style.cursor = this._toucheGizmo(x, y) ? "move" : this._plusProche(x, y, null, 10) >= 0 ? "pointer" : "default";
+      } else {
         const sur = this._plusProche(x, y, i => i < d.nbNoeuds && d.etat[i] === ENTREE, 14) >= 0;
         this.canvas.style.cursor = sur ? "ns-resize" : "grab";
       }
       return;
     }
-    const [x, y] = this._xy(e);
     const [mode, x0, y0] = this._drag;
     if (mode === "bille") {
       const [, yDepart, zDepart, i, echelle] = this._drag;
       let z = zDepart - (y - yDepart) / echelle;
-      if (this.desc.gz[i] >= 0) z = Math.max(z, 0);  // la bille ne traverse pas le plan
+      if (this.desc.gz[i] >= 0) z = Math.max(z, 0);      // la bille ne traverse pas le plan
       this.pos[3 * i + 2] = z;
       if (this.rappels.surPlacement) this.rappels.surPlacement(i, z);
       this.redessiner();
@@ -5061,26 +5493,86 @@ class Vue3D {
       this._drag = ["orbit", x0, y0];
       return this._pointerMove(e);
     }
+    if (mode === "attente-plan") {                        // glisser un point = deplacement dans le plan XY
+      if (Math.abs(x - x0) + Math.abs(y - y0) < 4) return;
+      const g = this._drag[3];
+      this._debutDeplacement(g.ids, -1, x0, y0, g);
+      return this._pointerMove(e);
+    }
+    if (mode === "deplace") {
+      const [, xs, ys, ids, axe, g] = this._drag;
+      const mx = x - xs, my = y - ys;
+      let dv = [0, 0, 0];
+      if (axe >= 0) {
+        const a = g.axes[axe];
+        dv[axe] = (mx * a.ux + my * a.uy) / a.parUnite;
+      } else {                                             // plan XY : systeme 2x2
+        const A = g.axes[0], B = g.axes[1], det = A.vx * B.vy - B.vx * A.vy;
+        if (Math.abs(det) > 1e-6) { dv[0] = (mx * B.vy - B.vx * my) / det; dv[1] = (A.vx * my - mx * A.vy) / det; }
+      }
+      if (this.pas > 0) dv = dv.map(v => Math.round(v / this.pas) * this.pas);
+      this._drag[6] = dv;
+      for (const i of ids) for (let k = 0; k < 3; k++) this.pos[3 * i + k] = this._posDepart[3 * i + k] + dv[k];
+      this._apercu = { type: "texte", texte: `Δ ${dv.map(v => v.toFixed(2)).join("  ")}`, tx: x, ty: y };
+      this.redessiner();
+      return;
+    }
+    if (mode === "cadre") {
+      this._apercu = { type: "cadre", x0: Math.min(x0, x), y0: Math.min(y0, y), x1: Math.max(x0, x), y1: Math.max(y0, y) };
+      this.redessiner();
+      return;
+    }
+    if (mode === "trace") {
+      const p0 = this._drag[3], p1 = this.surPlan(x, y, this.planZ);
+      const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      this._apercu = this.outil === "corde"
+        ? { type: "corde", p0, p1, texte: `corde ${L.toFixed(1)} (≈ ${Math.min(Math.max(Math.round(L * 2.5), 8), 200)} masses)`, tx: x, ty: y }
+        : { type: "membrane", p0, p1, texte: `membrane ${Math.abs(p1[0] - p0[0]).toFixed(1)} × ${Math.abs(p1[1] - p0[1]).toFixed(1)}`, tx: x, ty: y };
+      this.redessiner();
+      return;
+    }
     if (mode === "orbit") {
       this.yaw += (x - x0) * 0.008;
       this.pitch = Math.min(Math.max(this.pitch + (y - y0) * 0.008, -1.4), 1.5);
       this.canvas.style.cursor = "grabbing";
     } else { this.panx += x - x0; this.pany += y - y0; }
-    this._drag = [mode, x, y];
+    this._drag[1] = x; this._drag[2] = y;
     this.redessiner();
   }
 
   _pointerUp(e) {
-    if (this._drag && this._drag[0] === "maybe") {
-      const [x, y] = this._xy(e);
-      const i = this._plusProche(x, y, null, 12);
-      if (this._drag[3] && this.selection >= 0 && i >= 0 && i !== this.selection) this.selection2 = i;
-      else { this.selection = i; this.selection2 = -1; }
-      if (this.rappels.surSelection) this.rappels.surSelection(this.selection, this.selection2);
+    const dr = this._drag;
+    this._drag = null;
+    this.canvas.style.cursor = this.edition ? "default" : "grab";
+    if (!dr) return;
+    const [x, y] = this._xy(e);
+    if (dr[0] === "maybe") this.choisir(this._plusProche(x, y, null, 12), dr[3]);
+    else if (dr[0] === "attente-plan") { /* simple clic sur un point deja choisi */ }
+    else if (dr[0] === "cadre") {
+      const ap = this._apercu;
+      this._apercu = null;
+      if (!ap || ap.type !== "cadre") { this.choisir(-1, dr[3]); return; }
+      const P = this._projetteTout();
+      if (!dr[3]) this.multi.clear();
+      for (let i = 0; i < P.length / 4; i++)
+        if (!this._plancher.has(i) && P[4 * i] >= ap.x0 && P[4 * i] <= ap.x1 && P[4 * i + 1] >= ap.y0 && P[4 * i + 1] <= ap.y1) {
+          this.multi.add(i); this.selection = i;
+        }
+      if (!this.multi.size) this.selection = -1;
+      this._majSelection2();
+      if (this.rappels.surSelection) this.rappels.surSelection();
+      this.redessiner();
+    } else if (dr[0] === "deplace") {
+      this._apercu = null;
+      const dv = dr[6];
+      if (dv.some(v => v !== 0) && this.rappels.surDeplacement) this.rappels.surDeplacement([...this.multi], dv);
+      else { this.pos.set(this._posDepart); this.redessiner(); }
+    } else if (dr[0] === "trace") {
+      const p0 = dr[3], p1 = this.surPlan(x, y, this.planZ);
+      this._apercu = null;
+      if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 0.9 && this.rappels.surCreation) this.rappels.surCreation(this.outil, p0, p1);
       this.redessiner();
     }
-    this._drag = null;
-    this.canvas.style.cursor = "grab";
   }
 
   _zoomPas(pas) {
@@ -5094,6 +5586,185 @@ class Vue3D {
     const [px, py] = this._projette(...this.pos.subarray(3 * i, 3 * i + 3));
     return [px, py];
   }
+}
+
+
+/* ===== 45-edition.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Edition 3D -> script : chaque geste dans la vue (deplacer, ajouter *
+ *  un point, relier, tracer une corde ou une membrane) devient des    *
+ *  lignes du script, qui reste la reference (et s'exporte vers Max).  *
+ * ------------------------------------------------------------------ */
+
+const estPlancher = (mdl, nom) => /(^|_)sol$/.test(nom) && mdl.masses.has(nom) && mdl.masses.get(nom).genre === "ground";
+
+/* geometrie actuelle : position de chaque masse, ~place de chaque structure */
+function geometrieActuelle(mdl, desc) {
+  const masses = new Map(), macros = new Map();
+  for (const [nom, i] of desc.indices) masses.set(nom, [desc.gx[i], desc.gy[i], desc.gz[i]]);
+  for (const mc of desc.macros) {
+    const a = mc.debut, b = mc.debut + mc.nx * mc.ny - 1;
+    macros.set(mc.nom, [desc.gx[a], desc.gy[a], desc.gz[a], desc.gx[b], desc.gy[b], desc.gz[b]]);
+  }
+  return { masses, macros };
+}
+
+/* hauteur d'un point vise (@m ou proxy [@s a] / [@m a b]) dans une geometrie */
+function hauteurDans(geo, mdl, ref) {
+  if (ref.nom !== undefined) return (geo.masses.get(ref.nom) || [0, 0, 0])[2];
+  const pl = geo.macros.get(ref.macro);
+  if (!pl) return 0;
+  let a = 0.5;
+  try { a = Math.min(Math.max(evalue(ref.a, valeursParams(mdl)), 0), 1); } catch (e) { /* defaut */ }
+  return pl[2] + (pl[5] - pl[2]) * a;
+}
+
+const fmt = v => (Math.round(v * 100) / 100).toFixed(2);
+const fmtSeuil = v => { const r = Math.round(v * 1000) / 1000; return Number.isInteger(r) ? r.toFixed(1) : String(r); };
+
+/* Applique de nouvelles positions (masses : [x y z], structures : [x0 y0 z0 x1 y1 z1]).
+ * Les contacts "geometriques" (seuil = ecart de hauteur, comme le sol ou la bille
+ * au-dessus d'un objet) suivent : leur seuil est recalcule. */
+function ecrireGeometrie(texte, mdl, desc, changements) {
+  const avant = geometrieActuelle(mdl, desc);
+  const apres = { masses: new Map(avant.masses), macros: new Map(avant.macros) };
+  for (const [n, p] of changements.masses || []) apres.masses.set(n, p);
+  for (const [n, p] of changements.macros || []) apres.macros.set(n, p);
+  const lignes = texte.replace(/\s+$/, "").split("\n");
+  const ajouts = [];
+  const indexDe = re => lignes.findIndex(l => re.test(l));
+  const echappe = n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  for (const [nom, p] of changements.masses || []) {
+    const m = mdl.masses.get(nom);
+    if (!m) continue;
+    const g = p.map(fmt).join(" ");
+    if (m.geoEnLigne) {                                 // ancien dialecte : [x y z] dans la ligne
+      lignes[m.ligne - 1] = lignes[m.ligne - 1].replace(/\[[^\]@]*\]/, `[${g}]`);
+      continue;
+    }
+    const k = indexDe(new RegExp(`^\\s*~pos\\s+@${echappe(nom)}\\s`));
+    if (k >= 0) lignes[k] = `~pos @${nom} ${g}`; else ajouts.push(`~pos @${nom} ${g}`);
+  }
+  for (const [nom, p] of changements.macros || []) {
+    const g = p.map(fmt).join(" ");
+    const k = indexDe(new RegExp(`^\\s*~place\\s+@${echappe(nom)}\\s`));
+    if (k >= 0) lignes[k] = `~place @${nom} ${g}`; else ajouts.push(`~place @${nom} ${g}`);
+  }
+
+  if (!mdl.legacy) {
+    const bouges = new Set([...(changements.masses || []).keys(), ...(changements.macros || []).keys()]);
+    for (const it of mdl.interactions) {
+      if (it.genre !== "contact" && it.genre !== "nlContact") continue;
+      if (!bouges.has(nomRef(it.m1)) && !bouges.has(nomRef(it.m2))) continue;
+      const iSeuil = ARGS[it.genre][0].length, s = it.args[iSeuil];
+      const ecartAvant = hauteurDans(avant, mdl, it.m1) - hauteurDans(avant, mdl, it.m2);
+      const seuilAvant = s === undefined ? 0 : Number(s);
+      if (Number.isNaN(seuilAvant) || Math.abs(seuilAvant - ecartAvant) > 0.02) continue;   // pas geometrique
+      const args = it.args.slice();
+      args[iSeuil] = fmtSeuil(hauteurDans(apres, mdl, it.m1) - hauteurDans(apres, mdl, it.m2));
+      lignes[it.ligne - 1] = `@${it.nom} ${it.genre} ${refTexte(it.m1)} ${refTexte(it.m2)} ${args.join(" ")}`;
+    }
+  }
+  return lignes.concat(ajouts).join("\n") + "\n";
+}
+
+/* params partages (crees une fois, puis reutilises : un seul curseur pour tous) */
+function paramsPartages(mdl, defs, params) {
+  for (const [nom, v] of defs)
+    if (!mdl.params.has(nom) && !params.some(l => l.startsWith(`@${nom} `))) params.push(`@${nom} param ${v}`);
+}
+
+/* le sol du modele (s'il y en a un) et les reglages de ses contacts */
+function solDuModele(mdl) {
+  const nom = [...mdl.masses.keys()].find(n => estPlancher(mdl, n));
+  if (!nom) return null;
+  const c = mdl.interactions.find(i => i.genre === "contact" && i.m1.nom === nom);
+  return { nom, K: c ? c.args[0] : "1.0", Z: c ? c.args[1] : "0.005" };
+}
+
+/* ajoute une masse / un oscillateur / un point fixe a la position p */
+function ajouterPoint(mdl, genre, p, base) {
+  const params = [], corps = [], geo = [];
+  const nom = nomLibre(mdl, base || { mass: "m", osc: "osc", ground: "fixe" }[genre]);
+  if (genre === "mass") {
+    paramsPartages(mdl, [["points_M", 1]], params);
+    corps.push(`@${nom} mass points_M 0. 0.`);
+  } else if (genre === "osc") {
+    paramsPartages(mdl, [["points_M", 1], ["osc_K", 0.01], ["osc_Z", 0.00002]], params);
+    corps.push(`@${nom} osc points_M osc_K osc_Z 0. 0.`);
+  } else corps.push(`@${nom} ground 0.`);
+  const sol = solDuModele(mdl);
+  if (sol && genre !== "ground" && p[2] >= 0)
+    corps.push(`@${nom}_s contact @${sol.nom} @${nom} ${sol.K} ${sol.Z} ${fmtSeuil(-p[2])}`);
+  geo.push(`~pos @${nom} ${p.map(fmt).join(" ")}`);
+  return { ajout: { params, corps, geo }, nom };
+}
+
+/* ressort + amortisseur entre deux points (params partages liens_K / liens_Z) */
+function lignesLien(mdl, desc, i, j) {
+  const params = [];
+  const a = refAvecParams(mdl, desc, i, "lien", params);
+  const b = refAvecParams(mdl, desc, j, "lien", params);
+  paramsPartages(mdl, [["liens_K", 0.05], ["liens_Z", 0.0002]], params);
+  const nom = nomLibre(mdl, "lien", params.map(l => l.split(/\s+/)[0].slice(1)));
+  return { params, corps: [`@${nom} springDamper ${a} ${b} liens_K liens_Z`], geo: [] };
+}
+
+/* corde integree tracee de p0 a p1 ; membrane dans le rectangle p0-p1 */
+function lignesCorde(mdl, p0, p1, genre = "string") {
+  const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+  const n = Math.min(Math.max(Math.round(L * 2.5), 8), 200);
+  const nom = nomLibre(mdl, genre === "chain" ? "chaine" : "corde");
+  const params = [`@${nom}_K param 0.3`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`];
+  let def = `@${nom} ${genre} ${n} 1. ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
+  if (genre === "stiffString") {
+    params.push(`@${nom}_K2 param 0.1`);
+    def = `@${nom} stiffString ${n} 1. ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`;
+  }
+  return { ajout: { params, corps: [def], geo: [`~place @${nom} ${[...p0, ...p1].map(fmt).join(" ")}`] }, nom };
+}
+
+function lignesMembrane(mdl, p0, p1, genre = "closedMesh") {
+  const nx = Math.min(Math.max(Math.round(Math.abs(p1[0] - p0[0]) * 1.6) + 1, 4), 40);
+  const ny = Math.min(Math.max(Math.round(Math.abs(p1[1] - p0[1]) * 1.6) + 1, 4), 40);
+  const nom = nomLibre(mdl, "peau");
+  const x0 = Math.min(p0[0], p1[0]), x1 = Math.max(p0[0], p1[0]);
+  const y0 = Math.min(p0[1], p1[1]), y1 = Math.max(p0[1], p1[1]);
+  return {
+    ajout: {
+      params: [`@${nom}_K param 0.15`, `@${nom}_Z param 0.0006`, `@${nom}_Zo param 0.00005`],
+      corps: [`@${nom} ${genre} ${nx} ${ny} 1. ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`],
+      geo: [`~place @${nom} ${[x0, y0, p0[2], x1, y1, p0[2]].map(fmt).join(" ")}`],
+    }, nom,
+  };
+}
+
+/* ecoute de plusieurs points : une sortie chacun, reparties de gauche a droite */
+function lignesEcoutes(mdl, desc, indices) {
+  const params = [], corps = [], geo = [];
+  const pris = [];
+  indices.forEach((i, k) => {
+    const cible = refAvecParams(mdl, desc, i, "ecoute", params);
+    let n = 1; const deja = new Set([...mdl.sorties.map(s => s.nom), ...pris]);
+    while (deja.has(`out${n}`) || mdl.masses.has(`out${n}`)) n++;
+    const nom = `out${n}`; pris.push(nom);
+    corps.push(`@${nom} posOutput ${cible}`);
+    const pan = indices.length > 1 ? -1 + 2 * k / (indices.length - 1) : 0;
+    geo.push(`~sortie @${nom} pan ${fmt(pan)} gain 0`);
+  });
+  return { params, corps, geo };
+}
+
+/* remplace (ou cree) la ligne ~sortie d'une sortie */
+function ecrireRoutage(texte, nom, r) {
+  const ligne = `~sortie @${nom} pan ${fmt(r.pan)} gain ${fmt(r.gain)}` +
+                (r.canal ? ` canal ${r.canal | 0}` : "") + (r.muet ? " muet" : "");
+  const lignes = texte.replace(/\s+$/, "").split("\n");
+  const k = lignes.findIndex(l => new RegExp(`^\\s*~sortie\\s+@${nom}(\\s|$)`).test(l));
+  if (k >= 0) lignes[k] = ligne; else lignes.push(ligne);
+  return lignes.join("\n") + "\n";
 }
 
 
@@ -5239,12 +5910,19 @@ const app = {
 
   init() {
     this.vue = new Vue3D($("vue3d"), {
-      surSelection: (i, j) => this.majInspecteur(),
+      surSelection: () => this.majInspecteur(),
       surPlacement: (i, z) => this.placer(i, z),
+      surDeplacement: (ids, dv) => this.deplacer(ids, dv),
+      surCreation: (outil, p0, p1) => this.creer(outil, p0, p1),
+      surRelier: (i, j) => this.ajouterLignes(lignesLien(this.modele, this.desc, i, j)),
     });
     son.surMessage = d => this._messageSon(d);
     this._construitConstruire();
     this._branche();
+    this._brancheEdition();
+    this._brancheEcoute();
+    this._brancheSecours();
+    tuto.init();
     $("sld-ampli").value = 10;
     this.charger(MODELES_PRETS[0].script(), "corde-pincee.mdl");
     setTimeout(() => { budget.mesurer(); this.majJauge(); }, 300);
@@ -5257,6 +5935,8 @@ const app = {
     if (nom) { this.fichierNom = nom; document.title = `mi-gen Studio — ${nom}`; }
     this.reglagesAudio = new Map();
     this.valeursInitiales = new Map();
+    this._stables = null;
+    this.historique.push($("editeur").value);
     this.compiler({ garderVue: false });
   },
 
@@ -5279,8 +5959,11 @@ const app = {
     if (son.actif) this._envoieModeleSon(false);
     this._appliqueArchet();
     this._construitReglages();
+    if (son.multi && mdl.sorties.length !== son.nCanaux && son.ctx) this._modeCanaux();
+    this.majEcoute();
     this.majInspecteur();
     this.majJauge();
+    tuto.verifier();
     this.statut(`${statsModele(mdl)}`);
     $("stats-script").textContent = statsModele(mdl);
     if ($("p-export").classList.contains("actif")) this.majExport();
@@ -5338,6 +6021,7 @@ const app = {
     document.querySelectorAll("#onglets button").forEach(b => b.classList.toggle("actif", b.dataset.onglet === nom));
     document.querySelectorAll(".panneau").forEach(p => p.classList.toggle("actif", p.id === "p-" + nom));
     if (nom === "export") this.majExport();
+    if (typeof tuto !== "undefined") tuto.verifier();
   },
 
   /* ================= onglet Construire ================= */
@@ -5431,8 +6115,34 @@ const app = {
   },
 
   ajouterLignes(ajout, garderVue = true) {
-    $("editeur").value = insererLignes($("editeur").value, ajout);
+    this.modifierTexte(insererLignes($("editeur").value, ajout), garderVue);
+  },
+
+  /* toute modification du script passe ici : historique pour Annuler / Refaire */
+  historique: [],
+  futur: [],
+  modifierTexte(texte, garderVue = true) {
+    const avant = $("editeur").value;
+    if (texte === avant) return;
+    this.historique.push(avant);
+    if (this.historique.length > 200) this.historique.shift();
+    this.futur = [];
+    $("editeur").value = texte;
     this.compiler({ garderVue });
+  },
+  annuler() {
+    if (!this.historique.length) { this.statut("rien à annuler"); return; }
+    this.futur.push($("editeur").value);
+    $("editeur").value = this.historique.pop();
+    this.compiler();
+    this.statut("annulé");
+  },
+  refaire() {
+    if (!this.futur.length) { this.statut("rien à refaire"); return; }
+    this.historique.push($("editeur").value);
+    $("editeur").value = this.futur.pop();
+    this.compiler();
+    this.statut("refait");
   },
 
   /* ================= inspecteur (point selectionne) ================= */
@@ -5592,6 +6302,8 @@ const app = {
       for (const q of this.modele.params.values())            // params qui en dependent
         if (q.genre === "param" && q !== p) { try { q.valeur = evalue(q.brut, this.modele.params); } catch (e) { /* garde */ } }
     }
+    this._dernierChangement = performance.now();
+    this._majStabilite();
     this.rafraichirPhysique();
   },
 
@@ -5637,19 +6349,22 @@ const app = {
     btn.textContent = "🔊 Son"; btn.classList.add("actif");
     $("lbl-vitesse").classList.add("grise");
     this._envoieVolume();
+    if (son.multi) this._modeCanaux();
     this._envoieModeleSon(false);
     this._appliqueArchet();
     const nb = this.modele ? this.modele.sorties.length : 0;
     this.statut(`son actif · ${son.frequence} Hz · ` +
       (nb ? `${nb} sortie(s) écoutée(s)` : "pas de posOutput : on écoute 2 masses de l'objet") + " · espace = frapper");
     this.majJauge();
+    tuto.verifier();
   },
 
   _envoieVolume() { son.envoyer({ type: "gain", v: 10 ** (+$("sld-volume").value / 20), auto: $("chk-autovol").checked }); },
 
   _messageSon(d) {
-    if (d.type === "explosion") this.statut("EXPLOSION numérique → reset (baisse une raideur K ou monte un amortissement Z)");
+    if (d.type === "explosion") this.secours(true);
     else if (d.type === "etat" && son.actif && this.desc && d.u.length === this.desc.nbNoeuds + this.desc.nbProxies) {
+      this._noteStable();
       this.vue.majPositions(d.u, +$("sld-ampli").value, this._entraines);
       if (d.charge > 0) this._chargeMesuree = d.charge;
       this.majJauge();
@@ -5670,7 +6385,8 @@ const app = {
     $("btn-anim").textContent = "⏸ Pause"; $("btn-anim").classList.add("actif");
     const boucle = () => {
       if (!this.anime || !this.sim) return;
-      if (!this.sim.pas(+$("sld-vitesse").value)) this.statut("EXPLOSION numérique → reset (baisse une raideur K ou monte un amortissement Z)");
+      if (!this.sim.pas(+$("sld-vitesse").value)) this.secours(true);
+      else this._noteStable();
       this.vue.majPositions(this.sim.u, +$("sld-ampli").value, this._entraines);
       requestAnimationFrame(boucle);
     };
@@ -5918,11 +6634,660 @@ const app = {
       if (mod && e.key.toLowerCase() === "o") { e.preventDefault(); $("fichier-mdl").click(); }
       const saisie = /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName) || document.querySelector("dialog[open]");
       if (e.key === " " && !saisie && !mod) { e.preventDefault(); this.frapper(); }
-      if (e.key === "Escape" && !saisie) { this.vue.selection = this.vue.selection2 = -1; this.vue.redessiner(); this.majInspecteur(); }
+      if (e.key === "Escape" && !saisie) { this.vue.choisir(-1); if (this.vue.edition) this.choisirOutil("selection"); }
     });
   },
 };
 
+
+
+/* ===== 72-edition-app.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Mode Editer et inspecteur : placer, deplacer, relier, tracer,      *
+ *  supprimer, coordonnees exactes, selection multiple.                *
+ * ------------------------------------------------------------------ */
+
+Object.assign(app, {
+
+  _brancheEdition() {
+    $("btn-mode-jeu").addEventListener("click", () => this.modeEdition(false));
+    $("btn-mode-edit").addEventListener("click", () => this.modeEdition(true));
+    document.querySelectorAll("#outils-edition .outil").forEach(b =>
+      b.addEventListener("click", () => this.choisirOutil(b.dataset.outil)));
+    $("plan-z").addEventListener("change", () => { this.vue.planZ = +$("plan-z").value || 0; this.vue.redessiner(); });
+    $("chk-grille").addEventListener("change", () => { this.vue.pas = $("chk-grille").checked ? 0.5 : 0; });
+    $("btn-annuler").addEventListener("click", () => this.annuler());
+    $("btn-refaire").addEventListener("click", () => this.refaire());
+
+    document.addEventListener("keydown", e => {
+      const saisie = /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName) || document.querySelector("dialog[open]");
+      if (saisie) return;
+      const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+      if (mod && k === "z") { e.preventDefault(); if (e.shiftKey) this.refaire(); else this.annuler(); return; }
+      if (mod && k === "y") { e.preventDefault(); this.refaire(); return; }
+      if (e.key === "Tab") { e.preventDefault(); this.modeEdition(!this.vue.edition); return; }
+      if (!this.vue.edition || mod) return;
+      const outils = { v: "selection", m: "mass", o: "osc", f: "ground", l: "relier", c: "corde", b: "membrane" };
+      if (outils[k]) { this.choisirOutil(outils[k]); return; }
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this.supprimerSelection(); return; }
+      const fleches = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0],
+                        PageUp: [0, 0, 1], PageDown: [0, 0, -1] };
+      if (fleches[e.key] && this.vue.multi.size) {
+        e.preventDefault();
+        const p = this.vue.pas || 0.1;
+        this.deplacer([...this.vue.multi], fleches[e.key].map(v => v * p * (e.shiftKey ? 5 : 1)));
+      }
+    });
+  },
+
+  modeEdition(on) {
+    this.vue.edition = on;
+    this.vue._apercu = null; this.vue._relierDepuis = -1;
+    $("btn-mode-jeu").classList.toggle("actif", !on);
+    $("btn-mode-edit").classList.toggle("actif", on);
+    $("outils-edition").hidden = !on;
+    $("vue3d").style.cursor = on ? "default" : "grab";
+    if (on) this.choisirOutil(this.vue.outil);
+    this.statut(on
+      ? "Éditer : glisse les flèches X Y Z pour déplacer, cadre pour sélectionner, clic droit pour tourner, Suppr pour effacer · Tab = Jouer"
+      : `${statsModele(this.modele)} · Tab = Éditer`);
+    this.majInspecteur();
+    this.vue.redessiner();
+    tuto.verifier();
+  },
+
+  choisirOutil(o) {
+    this.vue.outil = o;
+    this.vue._apercu = null; this.vue._relierDepuis = -1;
+    document.querySelectorAll("#outils-edition .outil").forEach(b => b.classList.toggle("actif", b.dataset.outil === o));
+    const aide = {
+      selection: "clic = choisir, Maj+clic = ajouter, glisser dans le vide = cadre ; flèches X Y Z (ou glisser un point) = déplacer ; flèches du clavier = pas à pas, PgUp/PgDn = hauteur",
+      mass: "clic sur le plan de travail = poser une masse libre (il faudra la relier)",
+      osc: "clic sur le plan de travail = poser un oscillateur (il vibre seul autour de sa position)",
+      ground: "clic sur le plan de travail = poser un point fixe (pour accrocher des ressorts)",
+      relier: "clic sur un point puis sur un autre = ressort ; Maj pour enchaîner les liens",
+      corde: "glisse d'un bout à l'autre sur le plan de travail : corde intégrée mi-gen",
+      membrane: "glisse un rectangle sur le plan de travail : membrane intégrée mi-gen (bords fixes)",
+    }[o];
+    this.statut(`Outil : ${aide}`);
+    this.vue.redessiner();
+  },
+
+  /* ---------------- gestes -> script ---------------- */
+
+  deplacer(ids, dv) {
+    const d = this.desc, masses = new Map(), macros = new Map();
+    const geo = geometrieActuelle(this.modele, d);
+    for (const i of ids) {
+      if (i >= d.nbNoeuds || d.plancher.includes(i)) continue;
+      const el = d.element[i];
+      if (el !== d.noms[i]) {
+        if (!macros.has(el)) { const p = geo.macros.get(el); macros.set(el, p.map((v, k) => v + dv[k % 3])); }
+      } else if (!masses.has(el)) masses.set(el, geo.masses.get(el).map((v, k) => v + dv[k]));
+    }
+    if (!masses.size && !macros.size) { this.vue.charger(d, true); return; }
+    this.modifierTexte(ecrireGeometrie($("editeur").value, this.modele, d, { masses, macros }));
+    this.statut(`déplacé de ${dv.map(v => v.toFixed(2)).join(", ")}`);
+  },
+
+  /* coordonnees tapees dans l'inspecteur */
+  placerExactement(el, valeurs) {
+    const d = this.desc, masses = new Map(), macros = new Map();
+    if (this.modele.macros.has(el)) macros.set(el, valeurs); else masses.set(el, valeurs);
+    this.modifierTexte(ecrireGeometrie($("editeur").value, this.modele, d, { masses, macros }));
+  },
+
+  creer(outil, p0, p1) {
+    if (!this.modele) return;
+    let r;
+    if (outil === "corde") r = lignesCorde(this.modele, p0, p1);
+    else if (outil === "membrane") r = lignesMembrane(this.modele, p0, p1);
+    else r = ajouterPoint(this.modele, outil, p0);
+    this.ajouterLignes(r.ajout);
+    // selectionne ce qu'on vient de creer
+    const i = this.desc.noms.findIndex((n, k) => this.desc.element[k] === r.nom);
+    if (i >= 0) this.vue.choisir(i);
+    this.statut(`ajouté : @${r.nom}` + (outil === "mass" ? " — relie-la (outil ╱) sinon elle flotte" : ""));
+  },
+
+  supprimerSelection() {
+    const d = this.desc;
+    const elements = new Set([...this.vue.multi].filter(i => i < d.nbNoeuds && !d.plancher.includes(i)).map(i => d.element[i]));
+    if (!elements.size) return;
+    let texte = $("editeur").value, n = 0;
+    for (const el of elements) { const r = supprimerElement(texte, el); texte = r.texte; n += r.retires.length; }
+    this.vue.choisir(-1);
+    this.modifierTexte(texte);
+    this.statut(`supprimé : ${[...elements].map(e => "@" + e).join(" ")} (${n} lignes) — Ctrl+Z pour annuler`);
+  },
+
+  /* ---------------- inspecteur ---------------- */
+
+  majInspecteur() {
+    const insp = $("inspecteur"), d = this.desc, vue = this.vue;
+    const sel = [...vue.multi].filter(i => d && i < d.nbNoeuds + d.nbProxies);
+    if (!d || !sel.length) { insp.hidden = true; return; }
+    insp.hidden = false;
+    const zone = $("insp-actions"), coords = $("insp-coords");
+    zone.innerHTML = ""; coords.innerHTML = ""; $("insp-aide").textContent = "";
+    const bouton = (texte, aide, action) => {
+      const b = document.createElement("button");
+      b.className = "btn"; b.textContent = texte; b.title = aide;
+      b.addEventListener("click", action);
+      zone.appendChild(b);
+    };
+    const sep = () => { const s = document.createElement("span"); s.className = "sep"; zone.appendChild(s); };
+
+    if (sel.length > 1) {                                 // ---- plusieurs points
+      $("insp-titre").textContent = `${sel.length} points sélectionnés`;
+      $("insp-sous").textContent = sel.slice(0, 4).map(i => this._descriptionPoint(i)[0]).join(", ") + (sel.length > 4 ? "…" : "");
+      bouton(`🎧 Écouter ces ${sel.length} points`, "une sortie par point, réparties de gauche à droite (stéréo)", () => {
+        this.ecouterPoints(sel);
+        this.onglet("ecoute");
+      });
+      if (sel.length === 2) bouton("╱ Relier", "ressort + amortisseur entre les deux points", () =>
+        this.ajouterLignes(lignesLien(this.modele, d, sel[0], sel[1])));
+      else bouton("╱ Relier en chaîne", "un ressort entre chaque point et le suivant", () => {
+        let t = $("editeur").value, mdl = this.modele;
+        for (let k = 0; k + 1 < sel.length; k++) { t = insererLignes(t, lignesLien(mdl, d, sel[k], sel[k + 1])); mdl = parse(t); }
+        this.modifierTexte(t);
+      });
+      sep();
+      bouton("⚡ Impulsion", "coup sur chacun de ces points", () => sel.forEach(i => this.frapper(i)));
+      if (vue.edition) bouton("🗑 Supprimer", "supprime les éléments choisis (Suppr)", () => this.supprimerSelection());
+      return;
+    }
+
+    const i = sel[0];                                     // ---- un seul point
+    const [titre, sous] = this._descriptionPoint(i);
+    $("insp-titre").textContent = titre;
+    $("insp-sous").textContent = sous;
+    const entree = i < d.nbNoeuds && d.etat[i] === ENTREE;
+    const el = i < d.nbNoeuds ? d.element[i] : null;
+
+    if (vue.edition && el) {                              // coordonnees exactes
+      const mc = this.modele.macros.has(el);
+      const geo = geometrieActuelle(this.modele, d);
+      const v = mc ? geo.macros.get(el) : geo.masses.get(el);
+      const lab = document.createElement("span");
+      lab.textContent = mc ? `@${el} : début (x y z) puis fin (x y z)` : `@${el} : position x y z`;
+      coords.appendChild(lab);
+      const champs = v.map((c, k) => {
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.step = "0.5"; inp.value = c.toFixed(2); inp.title = ["x", "y", "z"][k % 3];
+        inp.addEventListener("change", () => this.placerExactement(el, champs.map(f => +f.value)));
+        coords.appendChild(inp);
+        return inp;
+      });
+    }
+
+    if (entree) {
+      const archet = this._entreesArchet().has(i);
+      $("insp-aide").textContent = archet
+        ? "Archet : il frotte quand il bouge. Monte le curseur 🎻 archet (en bas) pour un frottement continu, ou attrape la bille et bouge-la."
+        : "Entrée de position : attrape la bille (mode Jouer) et glisse verticalement.";
+    } else {
+      for (const [mode, ex] of Object.entries(EXCITATIONS))
+        bouton(ex.titre, ex.desc, () => {
+          this.ajouterLignes(lignesExcitation(this.modele, d, i, mode));
+          if (mode === "frotter") {
+            this.archet = 0.4; $("sld-archet").value = 0.4; $("val-archet").textContent = "0.40";
+            this._appliqueArchet();
+            this.statut("archet ajouté : il frotte déjà (vitesse 0.4) — règle 🎻 archet en bas, 0 pour l'arrêter");
+          }
+        });
+      bouton("🎧 Écouter", "ajoute une sortie sur ce point", () => {
+        this.ecouterPoints([i]);
+      });
+      sep();
+    }
+    bouton("⚡ Impulsion", "coup immédiat sur ce point (rien n'est ajouté au modèle)", () => this.frapper(i));
+    if (el && !d.plancher.includes(i))
+      bouton(`🗑 @${el}`, "supprime l'élément et tout ce qui s'y rattache (Ctrl+Z pour annuler)", () => {
+        const r = supprimerElement($("editeur").value, el);
+        vue.choisir(-1);
+        this.modifierTexte(r.texte);
+        this.statut(`supprimé : ${r.retires.length} ligne(s) — Ctrl+Z pour annuler`);
+      });
+    if (!vue.edition && !entree)
+      $("insp-aide").textContent = "Maj+clic sur d'autres points pour les écouter ensemble (stéréo) ou les relier. Tab = mode Éditer pour déplacer.";
+  },
+});
+
+
+/* ===== 74-ecoute.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Onglet Ecoute : plusieurs points d'ecoute, panoramique stereo ou   *
+ *  un canal par sortie (multicanal). Reglages gardes dans le script   *
+ *  (~sortie @outN pan p gain dB canal c), ignores par Max.            *
+ * ------------------------------------------------------------------ */
+
+Object.assign(app, {
+
+  _brancheEcoute() {
+    $("btn-ecouter-sel").addEventListener("click", () => {
+      const d = this.desc, sel = [...this.vue.multi].filter(i => d && i < d.nbNoeuds + d.nbProxies &&
+        !(i < d.nbNoeuds && (d.etat[i] === ENTREE || d.plancher.includes(i))));
+      if (!sel.length) { this.statut("choisis d'abord des points dans la vue (Maj+clic, ou cadre en mode Éditer)"); return; }
+      this.ecouterPoints(sel);
+    });
+    document.querySelectorAll("input[name=mode-canaux]").forEach(r => r.addEventListener("change", () => this._modeCanaux()));
+  },
+
+  _modeCanaux() {
+    const multi = document.querySelector("input[name=mode-canaux]:checked").value === "multi";
+    const n = multi ? Math.max(this.modele ? this.modele.sorties.length : 2, 2) : 2;
+    const obtenu = son.configurerCanaux(multi, n);
+    if (son.actif) {                       // nouveau noeud audio : on lui redonne tout
+      this._envoieVolume(); this._envoieModeleSon(false); this._appliqueArchet();
+    }
+    $("info-canaux").textContent = son.ctx
+      ? (multi ? `${obtenu} canal(aux) utilisés sur ${son.maxCanaux} disponibles` : "")
+      : (multi ? "le nombre de canaux de ta carte son sera lu au démarrage du son" : "");
+    this.majEcoute();
+  },
+
+  /* routage effectif des sorties (comme dans le moteur) */
+  _sortiesRoutees() {
+    if (!this.desc) return [];
+    return this.desc.sorties.map(s => ({ ...s }));
+  },
+
+  majEcoute() {
+    const zone = $("liste-sorties");
+    if (!zone || !this.modele) return;
+    zone.innerHTML = "";
+    const multi = son.multi;
+    const sorties = this._sortiesRoutees();
+    if (!sorties.length) {
+      zone.innerHTML = `<p class="aide">Aucune sortie : le son vient de deux masses prises au hasard. Choisis des points et clique « Écouter ».</p>`;
+      return;
+    }
+    const nCanaux = multi ? son.nCanaux : 2;
+    sorties.forEach((s, k) => {
+      const mdlS = this.modele.sorties.find(o => o.nom === s.nom);
+      const row = document.createElement("div");
+      row.className = "sortie";
+      const nom = document.createElement("b"); nom.textContent = s.nom;
+      const cible = document.createElement("span"); cible.className = "cible";
+      cible.textContent = refTexte(mdlS.cible) + (s.genre === "frcOutput" ? " (force)" : "");
+      cible.title = `${s.genre === "frcOutput" ? "force" : "position"} de ${refTexte(mdlS.cible)}`;
+      let reglage;
+      if (multi) {
+        reglage = document.createElement("select");
+        for (let c = 1; c <= Math.max(nCanaux, s.canal); c++) {
+          const o = document.createElement("option"); o.value = c; o.textContent = `canal ${c}`; reglage.appendChild(o);
+        }
+        reglage.value = s.canal;
+        reglage.addEventListener("change", () => this.changerRoutage(s.nom, { canal: +reglage.value }));
+      } else {
+        reglage = document.createElement("input");
+        reglage.type = "range"; reglage.min = -1; reglage.max = 1; reglage.step = 0.05; reglage.value = s.pan;
+        reglage.title = "panoramique : gauche ← → droite";
+        reglage.addEventListener("input", () => this.changerRoutage(s.nom, { pan: +reglage.value }));
+      }
+      const gain = document.createElement("input");
+      gain.type = "number"; gain.step = 1; gain.value = s.gain; gain.title = "gain en dB";
+      gain.addEventListener("change", () => this.changerRoutage(s.nom, { gain: +gain.value }));
+      const muet = document.createElement("button");
+      muet.textContent = "M"; muet.title = "couper cette sortie"; muet.className = s.muet ? "on" : "";
+      muet.addEventListener("click", () => this.changerRoutage(s.nom, { muet: !s.muet }, true));
+      const suppr = document.createElement("button");
+      suppr.textContent = "✕"; suppr.title = "supprimer cette sortie";
+      suppr.addEventListener("click", () => this.modifierTexte(supprimerElement($("editeur").value, s.nom).texte));
+      // montrer le point dans la vue au survol
+      row.addEventListener("mouseenter", () => { this.vue.choisir(s.i); });
+      row.append(nom, cible, reglage, gain, muet, suppr);
+      zone.appendChild(row);
+    });
+  },
+
+  /* ajoute des ecoutes puis repartit TOUTES les sorties de gauche a droite */
+  ecouterPoints(indices) {
+    let t = insererLignes($("editeur").value, lignesEcoutes(this.modele, this.desc, indices));
+    const mdl = parse(t), n = mdl.sorties.length;
+    mdl.sorties.forEach((s, k) => {
+      const r = mdl.routage.get(s.nom) || { gain: 0, muet: false, canal: null };
+      t = ecrireRoutage(t, s.nom, { ...r, pan: n > 1 ? -1 + 2 * k / (n - 1) : 0 });
+    });
+    this.modifierTexte(t);
+    this.statut(`${indices.length} point(s) d'écoute ajouté(s) ; les ${n} sorties sont réparties de gauche à droite (onglet Écoute)`);
+  },
+
+  /* pan / gain / canal / muet : ecrit dans le script et envoye au son sans coupure */
+  changerRoutage(nom, modif, reconstruire = false) {
+    const s = this.desc.sorties.find(o => o.nom === nom);
+    if (!s) return;
+    Object.assign(s, modif);
+    const r = { pan: s.pan, gain: s.gain, canal: son.multi || this.modele.routage.has(nom) && this.modele.routage.get(nom).canal ? s.canal : null, muet: s.muet };
+    $("editeur").value = ecrireRoutage($("editeur").value, nom, r);
+    this.modele.routage.set(nom, r);
+    son.envoyer({ type: "routage", sorties: this.desc.sorties.map(o => ({ pan: o.pan, gain: o.gain, canal: o.canal, muet: o.muet })) });
+    if (reconstruire) this.majEcoute();
+  },
+});
+
+
+/* ===== 76-reglages.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Reglages : legende des parametres (role de chaque curseur),        *
+ *  marge de stabilite, et secours quand le modele explose.            *
+ * ------------------------------------------------------------------ */
+
+const LEGENDE = {
+  M: ["masse", "inertie d'un point : plus lourd = plus grave et plus lent"],
+  K: ["raideur", "force de rappel d'un ressort : plus raide = plus aigu (fréquence ≈ √(K/M))"],
+  Z: ["amortissement", "frottement interne d'une liaison : plus grand = son plus court et plus mat"],
+  Zo: ["frein au repos", "frottement de chaque masse vers sa position de repos (« l'air ») : fait décroître tout le son"],
+  K2: ["flexion", "raideur de flexion d'une corde raide : harmoniques étirées, son plus métallique"],
+  Knl: ["force du pincement", "raideur du pincement : plus grand = attaque plus franche"],
+  Pscale: ["échelle du pincement", "distance à franchir avant que la corde ne « décroche »"],
+  Znl: ["pression d'archet", "force de frottement de l'archet"],
+  Vscale: ["vitesse d'accroche", "vitesse de glissement où l'archet accroche le plus : petit = archet plus « collant »"],
+  KnlP: ["raideur quadratique", "partie non linéaire (au carré) du ressort"],
+  KnlQ: ["raideur cubique", "partie non linéaire (au cube) : le son change avec la force de frappe"],
+  Klim: ["raideur maximale", "borne la raideur non linéaire (évite les explosions)"],
+  thresh: ["seuil", "écart avant le contact : 0 = au contact, négatif = il y a de l'espace"],
+  gravity: ["gravité", "force constante vers le bas"],
+  smooth: ["archet lisse", "1 = courbe d'archet lisse, 0 = anguleuse"],
+  nbMass: ["nombre de masses", "plus de masses = plus d'harmoniques, mais plus de calcul"],
+  nbX: ["masses en x", "taille de la membrane"], nbY: ["masses en y", "taille de la membrane"],
+  position: ["position", "point visé sur une corde ou une membrane : 0 = un bout, 1 = l'autre"],
+};
+const ORDRE_LEGENDE = ["M", "K", "Z", "Zo", "K2", "Knl", "Pscale", "Znl", "Vscale", "thresh", "position", "nbMass"];
+
+app._construitReglagesBase = app._construitReglages;
+
+Object.assign(app, {
+
+  /* role(s) de chaque param, d'apres l'endroit ou il sert dans le script */
+  _rolesParams() {
+    const mdl = this.modele, roles = new Map();
+    const note = (token, role, ou) => {
+      if (!token) return;
+      for (const n of String(token).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+        if (!mdl.params.has(n)) continue;
+        if (!roles.has(n)) roles.set(n, []);
+        const r = roles.get(n);
+        if (!r.some(x => x.role === role && x.ou === ou)) r.push({ role, ou });
+      }
+    };
+    const args = (genre, liste, ou) => {
+      const noms = [...ARGS[genre][0], ...ARGS[genre][1]];
+      liste.forEach((t, k) => note(t, noms[k], ou));
+    };
+    for (const m of mdl.masses.values()) if (ARGS[m.genre]) args(m.genre, m.args, "@" + m.nom);
+    for (const mc of mdl.macros.values()) args(mc.genre, mc.args, "@" + mc.nom);
+    for (const it of mdl.interactions) {
+      args(it.genre, it.args, `${it.genre} @${it.nom}`);
+      for (const r of [it.m1, it.m2]) if (r.macro !== undefined) { note(r.a, "position", "@" + r.macro); note(r.b, "position", "@" + r.macro); }
+    }
+    for (const s of [...mdl.sorties, ...mdl.entrees])
+      if (s.cible.macro !== undefined) { note(s.cible.a, "position", `@${s.nom}`); note(s.cible.b, "position", `@${s.nom}`); }
+    return roles;
+  },
+
+  _construitReglages() {
+    this._construitReglagesBase();
+    const roles = this._rolesParams();
+    // role sous chaque curseur
+    document.querySelectorAll("#liste-reglages .reglage").forEach(row => {
+      const nom = row.querySelector("label").textContent, r = roles.get(nom);
+      if (!r) return;
+      const div = document.createElement("div");
+      div.className = "role";
+      const parRole = new Map();
+      for (const x of r) { if (!parRole.has(x.role)) parRole.set(x.role, []); parRole.get(x.role).push(x.ou); }
+      div.textContent = [...parRole].map(([role, ou]) =>
+        `${role} — ${(LEGENDE[role] || [role])[0]} · ${ou.slice(0, 3).join(", ")}${ou.length > 3 ? "…" : ""}`).join(" ; ");
+      row.querySelector("label").title = [...parRole.keys()].map(k => LEGENDE[k] ? `${k} : ${LEGENDE[k][1]}` : k).join("\n");
+      row.appendChild(div);
+    });
+    // legende : les roles presents dans ce modele d'abord
+    const presents = new Set([...roles.values()].flat().map(x => x.role));
+    const dl = $("liste-legende");
+    dl.innerHTML = "";
+    for (const k of [...ORDRE_LEGENDE.filter(k => presents.has(k)), ...ORDRE_LEGENDE.filter(k => !presents.has(k))]) {
+      const dt = document.createElement("dt"), dd = document.createElement("dd");
+      dt.textContent = k; dd.textContent = `${LEGENDE[k][0]} : ${LEGENDE[k][1]}`;
+      if (!presents.has(k)) { dt.style.opacity = dd.style.opacity = 0.5; }
+      dl.append(dt, dd);
+    }
+    this._majStabilite();
+  },
+
+  /* ---------------- stabilite ---------------- */
+
+  _majStabilite() {
+    if (!this.modele) return;
+    let m;
+    try { m = margeStabilite(compiler(this.modele, { reglages: this.reglagesAudio })); } catch (e) { return; }
+    const el = $("stabilite");
+    const pc = Math.round(m.rapport * 100);
+    el.classList.toggle("alerte", m.rapport >= 1);
+    el.textContent = m.rapport >= 1
+      ? `⚠ Instable (${pc} %) : avec ces réglages le calcul va exploser. Baisse une raideur K ou augmente une masse M. 🛟 Secours revient aux derniers réglages stables.`
+      : `Stabilité du calcul : ${pc} % de la limite${m.rapport > 0.8 ? " — attention, proche de la limite" : ""}.`;
+    this._instable = m.rapport >= 1;
+  },
+
+  /* ---------------- secours ---------------- */
+
+  _brancheSecours() {
+    $("btn-secours").addEventListener("click", () => this.secours(false));
+  },
+
+  _valeursParams() {
+    const v = new Map();
+    for (const [n, p] of this.modele.params) v.set(n, p.genre === "param" ? p.valeur : (this.reglagesAudio.get(n) ?? 0.5));
+    return v;
+  },
+
+  /* appele quand le calcul tourne sans probleme : memorise des reglages "surs" */
+  _noteStable() {
+    if (!this.modele || this._instable) return;
+    if (performance.now() - (this._dernierChangement || 0) < 1500) return;
+    this._stables = this._valeursParams();
+  },
+
+  /* le modele a explose (auto) ou on clique Secours : retour aux derniers
+   * reglages stables, puis remise au repos */
+  secours(auto) {
+    if (!this.modele) return;
+    const actuels = this._valeursParams(), sur = this._stables;
+    const changes = [];
+    if (sur) for (const [n, v] of sur) if (this.modele.params.has(n) && actuels.get(n) !== v) changes.push([n, v]);
+    for (const [n, v] of changes) {
+      const p = this.modele.params.get(n);
+      if (p.genre === "audioParam") { this.reglagesAudio.set(n, v); continue; }
+      p.brut = String(v); p.valeur = v;
+      $("editeur").value = $("editeur").value.replace(new RegExp(`^(\\s*@${n}\\s+param\\s+)(\\S+)`, "m"), `$1${v}`);
+    }
+    this.desc = compiler(this.modele, { reglages: this.reglagesAudio });
+    this.vue.charger(this.desc, true);
+    if (son.actif) { this._envoieModeleSon(false); son.envoyer({ type: "reset" }); }
+    if (this.anime) this.sim = new Simulateur(this.desc);
+    this._appliqueArchet();
+    this._construitReglages();
+    this._dernierChangement = performance.now();
+    this.statut(changes.length
+      ? `${auto ? "💥 Le modèle a explosé : " : ""}retour aux derniers réglages stables (${changes.map(([n, v]) => `${n} = ${v}`).join(", ")})`
+      : auto ? "💥 Le modèle a explosé et a été remis au repos. Baisse une raideur K, monte une masse M ou un amortissement Z."
+             : "modèle remis au repos");
+  },
+});
+
+
+/* ===== 80-tuto.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Tutoriel interne : etapes guidees, chacune avec « Le faire pour    *
+ *  moi » ; on passe a la suivante des que l'action est faite.         *
+ * ------------------------------------------------------------------ */
+
+const ETAPES_TUTO = [
+  {
+    titre: "Bienvenue dans mi-gen",
+    texte: `Un modèle mi-gen, ce sont des <b>masses</b> (des points qui bougent) reliées par des
+      <b>interactions</b> : ressorts, contacts, pincements, archets. Les <b>structures intégrées</b>
+      (cordes, membranes) sont des grappes de masses calculées d'un bloc : c'est le plus efficace.
+      On va construire une corde et une membrane, les relier, puis les jouer.`,
+    faire: () => app.charger("# Mon premier modele mi-gen\n\n", "mon-modele.mdl"),
+    bouton: "Commencer (modèle vide)",
+    fait: () => app.modele && app.modele.masses.size + app.modele.macros.size === 0,
+  },
+  {
+    titre: "1. Passe en mode Éditer",
+    texte: `Clique <b>✎ Éditer</b> en haut à gauche de la vue (ou touche <b>Tab</b>). Une barre d'outils apparaît.
+      Le <b>plan de travail</b> (grille bleutée) est la hauteur où l'on pose les éléments.`,
+    faire: () => app.modeEdition(true),
+    fait: () => app.vue.edition,
+  },
+  {
+    titre: "2. Trace une corde intégrée",
+    texte: `Choisis l'outil <b>〰 corde</b> (touche C), puis <b>glisse</b> dans la vue d'un bout à l'autre.
+      Mi-gen crée une corde (<code>string</code>) aux extrémités fixes ; plus elle est longue, plus elle a de masses.`,
+    faire: () => app.creer("corde", [-8, 0, 4], [8, 0, 4]),
+    fait: () => [...app.modele.macros.values()].some(m => MACROS_CORDE.includes(m.genre)),
+  },
+  {
+    titre: "3. Ajoute une membrane",
+    texte: `Outil <b>▦ membrane</b> (touche B) : glisse un rectangle. Baisse d'abord <b>plan z</b> à 2 pour la poser
+      sous la corde. C'est une <code>closedMesh</code> : une peau tendue aux bords fixes.`,
+    faire: () => { $("plan-z").value = 2; app.vue.planZ = 2; app.creer("membrane", [-6, -12, 2], [6, -4, 2]); },
+    fait: () => [...app.modele.macros.values()].some(m => !MACROS_CORDE.includes(m.genre)),
+  },
+  {
+    titre: "4. Relie la corde à la membrane",
+    texte: `Outil <b>╱ relier</b> (touche L) : clique un point de la corde, puis un point de la membrane.
+      Sur une structure intégrée, le point devient un <b>proxy</b> : un point virtuel interpolé, dont la position
+      se règle ensuite avec un curseur. C'est le principe d'un chevalet sur une table d'harmonie.`,
+    faire: () => {
+      const d = app.desc, c = d.macros.find(m => m.corde), p = d.macros.find(m => !m.corde);
+      app.ajouterLignes(lignesLien(app.modele, d, c.debut + Math.floor(c.nx * 0.8), p.debut + Math.floor(p.nx / 2) * p.ny + Math.floor(p.ny / 2)));
+    },
+    fait: () => app.modele.interactions.some(i => i.m1.macro !== undefined && i.m2.macro !== undefined),
+  },
+  {
+    titre: "5. Pince la corde",
+    texte: `Repasse en <b>▶ Jouer</b> (Tab), clique un point de la corde : l'inspecteur (à droite) propose
+      <b>Pincer</b>. Une bille jaune apparaît : c'est une <b>entrée de position</b> que tu déplaces à la souris.`,
+    faire: () => {
+      app.modeEdition(false);
+      const d = app.desc, c = d.macros.find(m => m.corde);
+      app.ajouterLignes(lignesExcitation(app.modele, d, c.debut + Math.floor(c.nx * 0.27), "pincer"));
+    },
+    fait: () => app.modele.interactions.some(i => i.genre === "nlPluck"),
+  },
+  {
+    titre: "6. Écoute en stéréo",
+    texte: `<b>Maj+clic</b> sur un point de la corde puis un point de la membrane, puis
+      <b>🎧 Écouter ces 2 points</b>. Chacun devient une sortie, l'une à gauche, l'autre à droite.
+      L'onglet <b>Écoute</b> règle panoramique, gain, ou un canal par sortie (multicanal).`,
+    faire: () => {
+      const d = app.desc, c = d.macros.find(m => m.corde), p = d.macros.find(m => !m.corde);
+      app.ecouterPoints([c.debut + Math.floor(c.nx * 0.6), p.debut + 3 * p.ny + 3]);
+    },
+    fait: () => app.modele.sorties.length >= 2,
+  },
+  {
+    titre: "7. Joue !",
+    texte: `Clique <b>🔈 Son</b> en bas. Attrape la <b>bille jaune</b> et fais-la <b>traverser</b> la corde
+      (vers le bas ou le haut) : elle la pince. Ou <b>barre espace</b> pour un coup.`,
+    faire: () => { if (!son.actif) app.basculeSon(); },
+    fait: () => son.actif,
+  },
+  {
+    titre: "8. Règle le son",
+    texte: `Onglet <b>Réglages</b> : chaque paramètre est un curseur qui agit pendant que ça joue.
+      La <b>légende</b> explique M (masse), K (raideur), Z (amortissement)… Monte <b>corde_K</b> : la note monte.
+      Si ça « explose », <b>🛟 Secours</b> revient aux derniers réglages stables.`,
+    faire: () => app.onglet("reglages"),
+    fait: () => $("p-reglages").classList.contains("actif"),
+  },
+  {
+    titre: "9. Le frottement (archet)",
+    texte: `Un archet, c'est une <b>entrée qui avance à vitesse constante</b>, reliée à la corde par un
+      <code>nlBow</code>. Quand elle glisse lentement, le frottement « colle » la corde et l'entraîne ;
+      la corde finit par décrocher, revient, se recolle… Cet <b>accroche-glisse</b> entretient le son,
+      comme un violon. Clique un point de la corde → <b>Frotter</b> : l'archet démarre (curseur
+      <b>🎻 archet</b> en bas : vitesse, 0 = arrêt). <b>Znl</b> = pression, <b>Vscale</b> = vitesse d'accroche.`,
+    faire: () => {
+      const d = app.desc, c = d.macros.find(m => m.corde);
+      app.ajouterLignes(lignesExcitation(app.modele, d, c.debut + Math.floor(c.nx * 0.12), "frotter"));
+      app.archet = 0.4; $("sld-archet").value = 0.4; $("val-archet").textContent = "0.40"; app._appliqueArchet();
+    },
+    fait: () => app.modele.interactions.some(i => i.genre === "nlBow"),
+  },
+  {
+    titre: "10. Emporte-le dans Max",
+    texte: `Onglet <b>Max</b> : télécharge le <b>.gendsp</b>, range-le à côté de ton patch et crée
+      <code>[gen~ @gen nom]</code> vers <code>[dac~]</code> (package mi-gen installé). Les sorties <code>out1</code>,
+      <code>out2</code>… sont tes points d'écoute. Bravo, tu sais tout faire !`,
+    faire: () => app.onglet("export"),
+    fait: () => $("p-export").classList.contains("actif"),
+  },
+];
+
+const tuto = {
+  etape: 0,
+  ouvert: false,
+
+  init() {
+    $("tuto-faire").addEventListener("click", () => {
+      const e = ETAPES_TUTO[this.etape];
+      e.faire();
+      if (this.etape === 0) this.aller(1); else this.verifier();
+    });
+    $("tuto-suiv").addEventListener("click", () => this.aller(this.etape + 1));
+    $("tuto-prec").addEventListener("click", () => this.aller(this.etape - 1));
+    $("tuto-fermer").addEventListener("click", () => this.fermer());
+    document.querySelectorAll("[data-action=tuto]").forEach(b => b.addEventListener("click", () => this.ouvrir()));
+    let vu = true;
+    try { vu = localStorage.getItem("migen-tuto-vu") === "1"; } catch (e) { /* stockage indisponible */ }
+    if (!vu) setTimeout(() => this.ouvrir(), 600);
+  },
+
+  ouvrir() { this.ouvert = true; $("tuto").hidden = false; this.aller(0); },
+
+  fermer() {
+    this.ouvert = false; $("tuto").hidden = true;
+    try { localStorage.setItem("migen-tuto-vu", "1"); } catch (e) { /* rien */ }
+  },
+
+  aller(k) {
+    if (k >= ETAPES_TUTO.length) { this.fermer(); return; }
+    this.etape = Math.max(0, k);
+    const e = ETAPES_TUTO[this.etape];
+    $("tuto-etape").textContent = `Tutoriel · étape ${this.etape + 1} / ${ETAPES_TUTO.length}`;
+    $("tuto-titre").textContent = e.titre;
+    $("tuto-texte").innerHTML = e.texte;
+    $("tuto-faire").textContent = e.bouton || "Le faire pour moi";
+    $("tuto-suiv").textContent = this.etape === ETAPES_TUTO.length - 1 ? "Terminer" : "Suivant ▶";
+    $("tuto").classList.remove("fait");
+    this._attente = false;
+  },
+
+  /* appele apres chaque changement : passe a l'etape suivante si c'est fait */
+  verifier() {
+    if (!this.ouvert || this._attente || !app.modele) return;
+    const e = ETAPES_TUTO[this.etape];
+    let ok = false;
+    try { ok = e.fait(); } catch (err) { ok = false; }
+    if (!ok || this.etape === 0) return;
+    $("tuto").classList.add("fait");
+    this._attente = true;
+    setTimeout(() => { if (this.ouvert) this.aller(this.etape + 1); }, 1200);
+  },
+};
+
+
+/* ===== 99-demarrage.js ===== */
+"use strict";
+/* demarrage (apres tous les modules) */
 app.init();
 
 /* auto-test : ouvrir avec #selftest dans l'URL */

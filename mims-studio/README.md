@@ -36,6 +36,20 @@ Edge, Firefox ou Safari. Tout tourne en local.
   - **Frapper** avec la barre espace.
   - **Réglages** : chaque `@param` devient un curseur qui agit pendant que ça
     joue, sans coupure, et sa valeur est recopiée dans le script.
+- **Éditer en 3D** (touche Tab) : poignées X/Y/Z pour déplacer, sélection
+  au cadre, outils pour poser une masse, un oscillateur ou un point fixe sur
+  un plan de travail, relier deux points, tracer une corde ou une membrane
+  intégrée en glissant. Il y a aussi des coordonnées exactes, une grille
+  magnétique, Annuler / Refaire et Suppr. Les contacts au sol suivent les
+  points déplacés.
+- **Écoute multiple** : plusieurs points d'écoute répartis en stéréo
+  (panoramique, gain, muet), ou un canal par sortie (multicanal). Les
+  réglages sont gardés dans des lignes `~sortie`.
+- **Légende des paramètres** (M, K, Z, Zo…) et rôle de chaque curseur.
+  Une **marge de stabilité** prévient avant l'explosion. **Secours** : retour
+  automatique aux derniers réglages stables.
+- **Tutoriel** pas à pas (menu Aide), avec « Le faire pour moi » à chaque
+  étape.
 - **Budget matériel** : au démarrage, le studio mesure le coût réel d'une masse
   et d'une liaison sur ta machine. La jauge en bas indique la charge du son
   (mesurée dans le fil audio quand le son tourne). Au-delà de 100 %, le son
@@ -97,12 +111,19 @@ contact sont recalculés.
       js/30-formes.js       13 formes 3D paramétriques
       js/35-import3d.js     import .obj / .stl, simplification au budget
       js/36-modeles.js      modèles prêts à jouer, briques, actions de l'inspecteur
-      js/40-vue3d.js        vue 3D (canvas)
+      js/40-vue3d.js        vue 3D (canvas), mode Éditer (poignées, cadre, outils)
+      js/45-edition.js      gestes 3D -> lignes du script
       js/60-export.js       conversion MIMS4Max + appel du générateur officiel
       js/70-app.js          interface
+      js/72-edition-app.js  mode Éditer, inspecteur
+      js/74-ecoute.js       écoute multiple, stéréo / multicanal
+      js/76-reglages.js     légende, stabilité, secours
+      js/80-tuto.js         tutoriel pas à pas
+      js/99-demarrage.js    lancement
       vendor/mims4max/      générateur officiel MIMS4Max (mi-gen, GPL v3), non modifié
     tests/
       scenario_ui.js        pilote toute l'interface dans Chromium (Playwright)
+      scenario_edition.js   tutoriel, édition 3D, écoute multiple, secours
       exemples_officiels.js compare l'export aux sorties de MIMS4Max sur les exemples mi-gen
       fichiers/             objets 3D et ancien format pour les tests
 
@@ -110,6 +131,7 @@ Tests (Node + Playwright) :
 
     node build.js
     node tests/scenario_ui.js
+    node tests/scenario_edition.js
     node tests/exemples_officiels.js <chemin vers un clone de mi-gen>
 
 ## Version Python (ancienne)

@@ -25,6 +25,7 @@
   <div class="menu" id="menu-aide">
     <button>Aide</button>
     <div class="menu-liste">
+      <button data-action="tuto">Tutoriel pas à pas</button>
       <button data-action="aide">Prise en main et raccourcis</button>
       <button data-action="budget">Re-mesurer la machine</button>
     </div>
@@ -37,8 +38,9 @@
     <nav id="onglets">
       <button data-onglet="construire" class="actif">Construire</button>
       <button data-onglet="reglages">Réglages</button>
+      <button data-onglet="ecoute">Écoute</button>
       <button data-onglet="script">Script</button>
-      <button data-onglet="export">Export Max</button>
+      <button data-onglet="export">Max</button>
     </nav>
 
     <section id="p-construire" class="panneau actif">
@@ -60,16 +62,26 @@
     </section>
 
     <section id="p-reglages" class="panneau">
-      <div id="zone-archet" hidden>
-        <h4>Archet</h4>
-        <div class="reglage">
-          <label for="sld-archet">vitesse</label>
-          <input type="range" id="sld-archet" min="-1" max="1" step="0.01" value="0">
-          <span id="val-archet">0</span>
-        </div>
-      </div>
+      <details id="legende-params" open>
+        <summary>Légende des paramètres</summary>
+        <dl id="liste-legende"></dl>
+      </details>
+      <div id="stabilite" class="aide"></div>
       <div id="liste-reglages"></div>
       <p class="aide">Les curseurs agissent pendant que ça joue. Les valeurs sont recopiées dans le script.</p>
+    </section>
+
+    <section id="p-ecoute" class="panneau">
+      <p class="aide">Chaque sortie (posOutput / frcOutput) écoute un point. Choisis plusieurs points dans la vue
+        (Maj+clic ou cadre en mode Éditer) puis « 🎧 Écouter ces points » : ils sont répartis de gauche à droite.
+        Dans Max, chaque sortie devient une sortie <code>outN</code> du gen~.</p>
+      <div class="outils">
+        <label class="case"><input type="radio" name="mode-canaux" value="stereo" checked> stéréo (panoramique)</label>
+        <label class="case"><input type="radio" name="mode-canaux" value="multi"> multicanal</label>
+        <span id="info-canaux" class="discret"></span>
+      </div>
+      <div id="liste-sorties"></div>
+      <button class="btn" id="btn-ecouter-sel">🎧 Écouter les points sélectionnés</button>
     </section>
 
     <section id="p-script" class="panneau">
@@ -113,10 +125,42 @@
   <div id="droite">
     <div id="zone-canvas">
       <canvas id="vue3d"></canvas>
+      <div id="barre-mode">
+        <button class="btn actif" id="btn-mode-jeu" title="Jouer : attraper les billes, frapper (Tab pour changer)">▶ Jouer</button>
+        <button class="btn" id="btn-mode-edit" title="Éditer : placer, déplacer, relier, tracer (Tab pour changer)">✎ Éditer</button>
+        <span id="outils-edition" hidden>
+          <span class="sep-v"></span>
+          <button class="btn outil actif" data-outil="selection" title="Sélection / déplacement (V)">↖</button>
+          <button class="btn outil" data-outil="mass" title="Poser une masse libre (M)">● masse</button>
+          <button class="btn outil" data-outil="osc" title="Poser un oscillateur (O)">◉ osc</button>
+          <button class="btn outil" data-outil="ground" title="Poser un point fixe (F)">■ fixe</button>
+          <button class="btn outil" data-outil="relier" title="Relier deux points par un ressort (L) — Maj pour enchaîner">╱ relier</button>
+          <button class="btn outil" data-outil="corde" title="Tracer une corde intégrée : glisser (C)">〰 corde</button>
+          <button class="btn outil" data-outil="membrane" title="Tracer une membrane intégrée : glisser un rectangle (B)">▦ membrane</button>
+          <span class="sep-v"></span>
+          <label title="hauteur du plan de travail où l'on pose les points">plan z <input type="number" id="plan-z" value="4" step="0.5"></label>
+          <label title="magnétisme : arrondit les positions à la grille"><input type="checkbox" id="chk-grille" checked> grille</label>
+          <button class="btn" id="btn-annuler" title="Annuler (Ctrl+Z)">↶</button>
+          <button class="btn" id="btn-refaire" title="Refaire (Ctrl+Maj+Z)">↷</button>
+        </span>
+      </div>
+      <div id="tuto" hidden>
+        <div id="tuto-etape" class="discret"></div>
+        <h4 id="tuto-titre"></h4>
+        <div id="tuto-texte"></div>
+        <div class="actions-tuto">
+          <button class="btn" id="tuto-faire">Le faire pour moi</button>
+          <button class="btn" id="tuto-prec">◀</button>
+          <button class="btn" id="tuto-suiv">Suivant ▶</button>
+          <button class="btn" id="tuto-fermer">✕</button>
+        </div>
+      </div>
       <div id="inspecteur" hidden>
         <div id="insp-titre"></div>
         <div id="insp-sous" class="discret"></div>
+        <div id="insp-coords" class="insp-coords"></div>
         <div id="insp-actions"></div>
+        <div id="insp-aide"></div>
       </div>
       <div id="legende">
         <span><i class="pt" style="background:#5aa9e6"></i>masse</span>
@@ -130,7 +174,13 @@
       <button class="btn" id="btn-anim" title="Animer la simulation (sans son)">▶ Animer</button>
       <button class="btn" id="btn-son" title="Son temps réel : un pas de calcul par échantillon audio">🔈 Son</button>
       <button class="btn" id="btn-frapper" title="Frapper (espace)">⚡ Frapper</button>
-      <button class="btn" id="btn-reset">⟲</button>
+      <button class="btn" id="btn-reset" title="Remettre le modèle au repos">⟲</button>
+      <button class="btn" id="btn-secours" title="Le modèle a explosé ? Revient aux derniers réglages stables et remet au repos">🛟 Secours</button>
+      <span id="zone-archet" hidden>
+        <label title="vitesse de l'archet : 0 = immobile, + ou − = frotte dans un sens ou l'autre">🎻 archet
+          <input type="range" id="sld-archet" min="-1" max="1" step="0.01" value="0"></label>
+        <span id="val-archet">0</span>
+      </span>
       <label>force <input type="range" id="sld-force" min="0.01" max="1" step="0.01" value="0.3"></label>
       <label>volume <input type="range" id="sld-volume" min="-30" max="30" step="1" value="0"></label>
       <label title="ramène automatiquement le niveau vers un volume confortable"><input type="checkbox" id="chk-autovol" checked> auto</label>
@@ -203,9 +253,27 @@ JOUER
   Réglages : tous les @param en curseurs, actifs pendant le jeu.
   ▶ Animer : simulation visuelle sans son (curseur vitesse).
 
-VUE 3D
+VUE 3D (mode Jouer)
   glisser : orbiter      molette : zoom      clic droit : déplacer
-  double-clic : recadrer clic : sélectionner Maj+clic : 2e point
+  double-clic : recadrer clic : sélectionner Maj+clic : ajouter
+
+ÉDITER (Tab ou ✎ Éditer)
+  V sélection : clic, Maj+clic, cadre ; flèches X Y Z ou glisser un
+    point = déplacer (grille 0,5) ; flèches clavier, PgUp/PgDn = hauteur
+  M masse · O oscillateur · F point fixe : clic sur le plan de travail
+  L relier : clic sur 2 points (Maj = enchaîner)
+  C corde · B membrane : glisser sur le plan de travail
+  plan z : hauteur du plan de travail   Suppr : effacer
+  Ctrl+Z / Ctrl+Maj+Z : annuler / refaire   clic droit : tourner
+
+ÉCOUTE
+  plusieurs points (Maj+clic) → « Écouter ces points » : stéréo répartie
+  onglet Écoute : panoramique, gain, muet, ou un canal par sortie
+
+SECOURS
+  la jauge « stabilité » (Réglages) prévient avant l'explosion ;
+  si ça explose, retour automatique aux derniers réglages stables
+  (ou bouton 🛟 Secours)
 
 BUDGET
   La jauge en bas indique la charge du son sur un coeur de ta machine

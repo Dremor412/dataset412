@@ -18,6 +18,7 @@ const verif = (ok, msg) => { console.log(`${ok ? "ok  " : "ECHEC"} ${msg}`); if 
   await p.goto("file://" + path.join(__dirname, "..", "MIMS_Studio.html"));
   await p.waitForTimeout(1500);
   const ev = (f, a) => p.evaluate(f, a);
+  await ev(() => tuto.fermer());                     // le tutoriel s'ouvre a la 1re visite
 
   // 1. budget machine
   const bud = await ev(() => ({ m: budget.coutMasse * 1e9, l: budget.coutLien * 1e9, mes: budget.mesure, max: budget.maxMasses(3) }));
@@ -50,7 +51,7 @@ const verif = (ok, msg) => { console.log(`${ok ? "ok  " : "ECHEC"} ${msg}`); if 
     let e = 0;
     for (let b = 0; b < 400; b++) {
       if (b === 10) n.message({ type: "placer", i, u: -1 });
-      n.remplir(L, R);
+      n.remplir([L, R]);
       if (b > 40) for (const v of L) e += v * v;
     }
     return Math.sqrt(e / (360 * 128));
@@ -66,7 +67,7 @@ const verif = (ok, msg) => { console.log(`${ok ? "ok  " : "ECHEC"} ${msg}`); if 
     const L = new Float32Array(128), R = new Float32Array(128);
     const rms = [];
     for (let b = 0; b < 1500; b++) {
-      n.remplir(L, R);
+      n.remplir([L, R]);
       let e = 0; for (const v of L) e += v * v; rms.push(Math.sqrt(e / 128));
     }
     const moy = a => a.reduce((s, v) => s + v, 0) / a.length;
