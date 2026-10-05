@@ -62,7 +62,14 @@
     </section>
 
     <section id="p-reglages" class="panneau">
-      <details id="legende-params" open>
+      <div id="zone-etats">
+        <div class="outils">
+          <button class="btn" id="btn-memoriser" title="Mémorise tous les réglages actuels dans le .mdl (ligne ~etat)">📸 Mémoriser l'état</button>
+          <span class="discret">clic = y revenir en douceur · double-clic = renommer · ✕ = oublier</span>
+        </div>
+        <div id="liste-etats" class="puces"></div>
+      </div>
+      <details id="legende-params">
         <summary>Légende des paramètres</summary>
         <dl id="liste-legende"></dl>
       </details>
@@ -174,6 +181,7 @@
       <button class="btn" id="btn-anim" title="Animer la simulation (sans son)">▶ Animer</button>
       <button class="btn" id="btn-son" title="Son temps réel : un pas de calcul par échantillon audio">🔈 Son</button>
       <button class="btn" id="btn-frapper" title="Frapper (espace)">⚡ Frapper</button>
+      <button class="btn" id="btn-options" title="Options de jeu : fluidité, frappe aléatoire, répétition, anti-craquements">⚙</button>
       <button class="btn" id="btn-reset" title="Remettre le modèle au repos">⟲</button>
       <button class="btn" id="btn-secours" title="Le modèle a explosé ? Revient aux derniers réglages stables et remet au repos">🛟 Secours</button>
       <span id="zone-archet" hidden>
@@ -186,6 +194,25 @@
       <label title="ramène automatiquement le niveau vers un volume confortable"><input type="checkbox" id="chk-autovol" checked> auto</label>
       <label>ampli. vue <input type="range" id="sld-ampli" min="1" max="200" step="1" value="20"></label>
       <label id="lbl-vitesse">vitesse <input type="range" id="sld-vitesse" min="30" max="1500" value="400"></label>
+    </div>
+    <div id="options-jeu" hidden>
+      <h4>Options de jeu</h4>
+      <div class="opt"><label for="opt-fluidite">fluidité des réglages et de la bille</label>
+        <input type="range" id="opt-fluidite" min="0" max="500" step="5" value="40"><span id="val-fluidite">40 ms</span></div>
+      <p class="aide">Temps pour glisser vers une nouvelle valeur : plus long = plus doux, sans clic ; 0 = immédiat.</p>
+      <div class="opt"><label for="opt-alea">force aléatoire</label>
+        <input type="range" id="opt-alea" min="0" max="100" step="5" value="0"><span id="val-alea">0 %</span></div>
+      <div class="opt"><label><input type="checkbox" id="opt-hasard"> frapper un point au hasard</label></div>
+      <div class="opt"><label><input type="checkbox" id="opt-repeter"> répéter la frappe</label>
+        <input type="number" id="opt-bpm" min="10" max="1200" value="120"><span>BPM</span></div>
+      <h4>Anti-craquements</h4>
+      <div class="opt"><label for="opt-coupebas">coupe-bas</label>
+        <input type="range" id="opt-coupebas" min="5" max="300" step="5" value="30"><span id="val-coupebas">30 Hz</span></div>
+      <p class="aide">Les basses très fortes font saturer les petits haut-parleurs (crépitements) : monte à 60–120 Hz.</p>
+      <div class="opt"><label for="opt-latence">latence audio</label>
+        <select id="opt-latence"><option value="interactive">basse (réactif)</option><option value="balanced">moyenne</option>
+          <option value="playback">haute (le plus stable)</option></select></div>
+      <p class="aide">Si le son grésille quand le modèle est gros, une latence plus haute laisse plus de temps au calcul.</p>
     </div>
     <div id="statut">
       <span id="statut-texte">prêt</span>

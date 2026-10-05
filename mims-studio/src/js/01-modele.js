@@ -149,6 +149,8 @@ function nouveauModele() {
     avertissements: [],
     legacy: false,            // ancien dialecte (positions 3D dans la ligne de masse)
     routage: new Map(),       // ~sortie @outN pan p gain dB canal c muet : nom -> reglages
+    favoris: [],              // ~favoris p1 p2 ... : parametres epingles en haut des Reglages
+    etats: [],                // ~etat nom p1=v1 p2=v2 ... : reglages memorises
   };
 }
 
@@ -213,6 +215,17 @@ function parse(texte) {
       const v = p.slice(2).map(Number);
       if (v.some(Number.isNaN)) { err(num, "~pos : coordonnees non numeriques"); return; }
       geo.set(p[1].slice(1), v);
+      return;
+    }
+    if (p[0] === "~favoris") { mdl.favoris = p.slice(1); return; }
+    if (p[0] === "~etat") {
+      if (p.length < 2) { err(num, "~etat : attendu ~etat nom param=valeur ..."); return; }
+      const valeurs = new Map();
+      for (const t of p.slice(2)) {
+        const m = /^([A-Za-z_][A-Za-z0-9_]*)=(-?[\d.eE+-]+)$/.exec(t);
+        if (m) valeurs.set(m[1], Number(m[2]));
+      }
+      mdl.etats.push({ nom: p[1], valeurs, ligne: num });
       return;
     }
     if (p[0] === "~sortie") {                    // routage d'une sortie (studio seulement)

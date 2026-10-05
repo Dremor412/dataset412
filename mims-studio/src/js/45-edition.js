@@ -120,13 +120,25 @@ function lignesLien(mdl, desc, i, j) {
   return { params, corps: [`@${nom} springDamper ${a} ${b} liens_K liens_Z`], geo: [] };
 }
 
+/* raideur d'une corde (extremites fixes, n masses de 1) pour que sa note
+ * fondamentale soit @nom_hz : f = 44100/pi * sqrt(K) * sin(pi / (2 (n-1))).
+ * Expression gen~ valide : elle s'exporte telle quelle vers Max. */
+function raideurPourNote(nom, n, M = 1) {
+  return `[${M === 1 ? "" : M + "*"}pow(3.14159*${nom}_hz/(44100*sin(3.14159/${2 * (n - 1)})),2)]`;
+}
+
 /* corde integree tracee de p0 a p1 ; membrane dans le rectangle p0-p1 */
 function lignesCorde(mdl, p0, p1, genre = "string") {
   const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
   const n = Math.min(Math.max(Math.round(L * 2.5), 8), 200);
   const nom = nomLibre(mdl, genre === "chain" ? "chaine" : "corde");
-  const params = [`@${nom}_K param 0.3`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`];
-  let def = `@${nom} ${genre} ${n} 1. ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
+  // corde : accordee en Hz (la raideur K en decoule) ; chaine / corde raide : raideur K
+  const params = genre === "string"
+    ? [`@${nom}_hz param 110`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`]
+    : [`@${nom}_K param 0.3`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`];
+  let def = genre === "string"
+    ? `@${nom} string ${n} 1. ${raideurPourNote(nom, n)} ${nom}_Z ${nom}_Zo 0. 0.`
+    : `@${nom} ${genre} ${n} 1. ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
   if (genre === "stiffString") {
     params.push(`@${nom}_K2 param 0.1`);
     def = `@${nom} stiffString ${n} 1. ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`;

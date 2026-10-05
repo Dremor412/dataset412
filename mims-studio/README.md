@@ -45,6 +45,21 @@ Edge, Firefox ou Safari. Tout tourne en local.
 - **Écoute multiple** : plusieurs points d'écoute répartis en stéréo
   (panoramique, gain, muet), ou un canal par sortie (multicanal). Les
   réglages sont gardés dans des lignes `~sortie`.
+- **Réglages en calques** : un volet repliable par objet (corde, membrane,
+  pincement, archet, écoute…). Les paramètres essentiels sont visibles tout
+  de suite, le reste est sous « options ». Les favoris ⭐ sont épinglés en
+  haut (`~favoris`). Les plages sont larges : une zone rouge sous chaque
+  curseur marque la limite de stabilité estimée, sans bloquer.
+- **États** : 📸 mémorise tous les réglages dans le `.mdl` (`~etat nom
+  p=v …`). Un clic sur l'état y revient en douceur.
+- **Fluidité** : un réglage qui change glisse de son ancienne valeur à la
+  nouvelle (raideurs, masses, positions des proxies), sans clic. La durée
+  se règle dans ⚙.
+- **Options de jeu** (⚙) : force aléatoire, point frappé au hasard,
+  répétition en BPM, coupe-bas et latence audio contre les craquements.
+- **Corde accordée en Hz** : `@corde_hz` donne la note, la raideur en
+  découle (expression gen~ exportée telle quelle). Baisser la note revient
+  à allonger la corde virtuellement, sans ajouter de masses.
 - **Légende des paramètres** (M, K, Z, Zo…) et rôle de chaque curseur.
   Une **marge de stabilité** prévient avant l'explosion. **Secours** : retour
   automatique aux derniers réglages stables.
@@ -118,12 +133,15 @@ contact sont recalculés.
       js/72-edition-app.js  mode Éditer, inspecteur
       js/74-ecoute.js       écoute multiple, stéréo / multicanal
       js/76-reglages.js     légende, stabilité, secours
+      js/77-calques.js      réglages en calques, favoris, états, limites de stabilité
+      js/78-jeu.js          options de jeu (fluidité, frappe aléatoire, répétition, anti-craquements)
       js/80-tuto.js         tutoriel pas à pas
       js/99-demarrage.js    lancement
       vendor/mims4max/      générateur officiel MIMS4Max (mi-gen, GPL v3), non modifié
     tests/
       scenario_ui.js        pilote toute l'interface dans Chromium (Playwright)
       scenario_edition.js   tutoriel, édition 3D, écoute multiple, secours
+      scenario_reglages.js  calques, favoris, états, limites, options de jeu
       exemples_officiels.js compare l'export aux sorties de MIMS4Max sur les exemples mi-gen
       fichiers/             objets 3D et ancien format pour les tests
 
@@ -132,6 +150,7 @@ Tests (Node + Playwright) :
     node build.js
     node tests/scenario_ui.js
     node tests/scenario_edition.js
+    node tests/scenario_reglages.js
     node tests/exemples_officiels.js <chemin vers un clone de mi-gen>
 
 ## Version Python (ancienne)

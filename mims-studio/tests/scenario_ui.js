@@ -79,14 +79,14 @@ const verif = (ok, msg) => { console.log(`${ok ? "ok  " : "ECHEC"} ${msg}`); if 
   const chaud = await ev(() => {
     const mdl = parse(MODELES_PRETS[0].script());
     const a = new Simulateur(compiler(mdl)); a.frapper(20, 0.3); a.pas(500);
-    mdl.params.get("corde_K").valeur = 0.5;
+    mdl.params.get("corde_hz").brut = "150";
     const b2 = new Simulateur(compiler(mdl));
     return b2.adopter(a) && b2.u[20] === a.u[20] && b2.u[20] !== 0;
   });
   verif(chaud, "changer un parametre garde l'etat de la simulation (pas de coupure)");
   await p.click("#liste-modeles .carte >> nth=0");
   await p.click("#onglets button[data-onglet=reglages]");
-  const sld = await p.$("#liste-reglages input[type=range]:not([disabled])");
+  const sld = await p.$(".reglage[data-param=pince_pos] input[type=range]");
   const ligneAvant = await ev(() => $("editeur").value.split("\n").find(l => /^@pince_pos/.test(l)));
   await sld.evaluate(e => { e.value = 600; e.dispatchEvent(new Event("input")); });
   await p.waitForTimeout(200);

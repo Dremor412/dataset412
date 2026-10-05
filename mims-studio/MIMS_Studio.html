@@ -184,6 +184,42 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
 .insp-coords span { grid-column: 1 / -1; font-size: 11px; color: var(--discret); }
 #insp-aide { font-size: 11.5px; color: var(--discret); margin-top: 8px; }
 
+/* ---------- calques de reglages, favoris, etats ---------- */
+.calque { border: 1px solid var(--bord); border-radius: 6px; margin: 6px 0; background: var(--panneau2); }
+.calque > .entete { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; user-select: none; }
+.calque > .entete:hover { background: #2a3140; }
+.calque > .entete .fleche { width: 12px; color: var(--discret); }
+.calque > .entete .type { color: var(--discret); font-size: 11.5px; margin-left: auto; }
+.calque > .corps { padding: 2px 8px 6px; }
+.calque.ferme > .corps { display: none; }
+.calque.favoris { border-color: #6b5a1e; }
+.options-calque { margin-top: 2px; }
+.options-calque > summary { font-size: 12px; color: var(--discret); cursor: pointer; padding: 2px 0; }
+.reglage { grid-template-columns: 16px 1fr 116px 70px 16px; }
+.reglage .etoile { background: none; border: none; cursor: pointer; padding: 0; color: #5b6472; font-size: 13px; }
+.reglage .etoile.on { color: #f4d03f; }
+.curseur { position: relative; }
+.curseur input[type="range"] { width: 100%; position: relative; z-index: 1; }
+.curseur .rouge { position: absolute; bottom: 1px; height: 4px; background: #b5403b; border-radius: 2px; opacity: .85; }
+.reglage.danger input[type="number"] { border-color: var(--erreur); color: var(--erreur); }
+#zone-etats { margin-bottom: 6px; }
+#zone-etats .outils { padding: 4px 0; }
+#liste-etats .puce.etat { display: inline-flex; gap: 6px; align-items: center; }
+#liste-etats .puce.etat .x { color: var(--discret); }
+#liste-etats .puce.etat .x:hover { color: var(--erreur); }
+
+#droite { position: relative; }
+#options-jeu { position: absolute; right: 10px; bottom: 80px; width: 330px; z-index: 20; background: rgba(30,35,44,.98);
+               border: 1px solid #3a4454; border-radius: 8px; padding: 8px 12px; box-shadow: 0 6px 22px rgba(0,0,0,.5); }
+#options-jeu h4 { margin: 6px 0 4px; font-size: 12px; text-transform: uppercase; color: var(--discret); letter-spacing: .05em; }
+#options-jeu .opt { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12.5px; }
+#options-jeu .opt label { flex: 1; }
+#options-jeu .opt input[type="range"] { width: 110px; }
+#options-jeu .opt input[type="number"] { width: 58px; background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; }
+#options-jeu .opt select { background: #1b1f26; color: var(--texte); border: 1px solid #3a4454; border-radius: 3px; }
+#options-jeu .opt span { min-width: 46px; color: var(--discret); font-size: 12px; }
+#options-jeu .aide { margin: 0 0 6px; font-size: 11.5px; }
+
 </style>
 </head>
 <body>
@@ -240,7 +276,14 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
     </section>
 
     <section id="p-reglages" class="panneau">
-      <details id="legende-params" open>
+      <div id="zone-etats">
+        <div class="outils">
+          <button class="btn" id="btn-memoriser" title="Mémorise tous les réglages actuels dans le .mdl (ligne ~etat)">📸 Mémoriser l'état</button>
+          <span class="discret">clic = y revenir en douceur · double-clic = renommer · ✕ = oublier</span>
+        </div>
+        <div id="liste-etats" class="puces"></div>
+      </div>
+      <details id="legende-params">
         <summary>Légende des paramètres</summary>
         <dl id="liste-legende"></dl>
       </details>
@@ -352,6 +395,7 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
       <button class="btn" id="btn-anim" title="Animer la simulation (sans son)">▶ Animer</button>
       <button class="btn" id="btn-son" title="Son temps réel : un pas de calcul par échantillon audio">🔈 Son</button>
       <button class="btn" id="btn-frapper" title="Frapper (espace)">⚡ Frapper</button>
+      <button class="btn" id="btn-options" title="Options de jeu : fluidité, frappe aléatoire, répétition, anti-craquements">⚙</button>
       <button class="btn" id="btn-reset" title="Remettre le modèle au repos">⟲</button>
       <button class="btn" id="btn-secours" title="Le modèle a explosé ? Revient aux derniers réglages stables et remet au repos">🛟 Secours</button>
       <span id="zone-archet" hidden>
@@ -364,6 +408,25 @@ dialog .apercu { margin-top: 10px; padding: 8px; background: #1b1f26; border-rad
       <label title="ramène automatiquement le niveau vers un volume confortable"><input type="checkbox" id="chk-autovol" checked> auto</label>
       <label>ampli. vue <input type="range" id="sld-ampli" min="1" max="200" step="1" value="20"></label>
       <label id="lbl-vitesse">vitesse <input type="range" id="sld-vitesse" min="30" max="1500" value="400"></label>
+    </div>
+    <div id="options-jeu" hidden>
+      <h4>Options de jeu</h4>
+      <div class="opt"><label for="opt-fluidite">fluidité des réglages et de la bille</label>
+        <input type="range" id="opt-fluidite" min="0" max="500" step="5" value="40"><span id="val-fluidite">40 ms</span></div>
+      <p class="aide">Temps pour glisser vers une nouvelle valeur : plus long = plus doux, sans clic ; 0 = immédiat.</p>
+      <div class="opt"><label for="opt-alea">force aléatoire</label>
+        <input type="range" id="opt-alea" min="0" max="100" step="5" value="0"><span id="val-alea">0 %</span></div>
+      <div class="opt"><label><input type="checkbox" id="opt-hasard"> frapper un point au hasard</label></div>
+      <div class="opt"><label><input type="checkbox" id="opt-repeter"> répéter la frappe</label>
+        <input type="number" id="opt-bpm" min="10" max="1200" value="120"><span>BPM</span></div>
+      <h4>Anti-craquements</h4>
+      <div class="opt"><label for="opt-coupebas">coupe-bas</label>
+        <input type="range" id="opt-coupebas" min="5" max="300" step="5" value="30"><span id="val-coupebas">30 Hz</span></div>
+      <p class="aide">Les basses très fortes font saturer les petits haut-parleurs (crépitements) : monte à 60–120 Hz.</p>
+      <div class="opt"><label for="opt-latence">latence audio</label>
+        <select id="opt-latence"><option value="interactive">basse (réactif)</option><option value="balanced">moyenne</option>
+          <option value="playback">haute (le plus stable)</option></select></div>
+      <p class="aide">Si le son grésille quand le modèle est gros, une latence plus haute laisse plus de temps au calcul.</p>
     </div>
     <div id="statut">
       <span id="statut-texte">prêt</span>
@@ -2699,6 +2762,8 @@ function nouveauModele() {
     avertissements: [],
     legacy: false,            // ancien dialecte (positions 3D dans la ligne de masse)
     routage: new Map(),       // ~sortie @outN pan p gain dB canal c muet : nom -> reglages
+    favoris: [],              // ~favoris p1 p2 ... : parametres epingles en haut des Reglages
+    etats: [],                // ~etat nom p1=v1 p2=v2 ... : reglages memorises
   };
 }
 
@@ -2763,6 +2828,17 @@ function parse(texte) {
       const v = p.slice(2).map(Number);
       if (v.some(Number.isNaN)) { err(num, "~pos : coordonnees non numeriques"); return; }
       geo.set(p[1].slice(1), v);
+      return;
+    }
+    if (p[0] === "~favoris") { mdl.favoris = p.slice(1); return; }
+    if (p[0] === "~etat") {
+      if (p.length < 2) { err(num, "~etat : attendu ~etat nom param=valeur ..."); return; }
+      const valeurs = new Map();
+      for (const t of p.slice(2)) {
+        const m = /^([A-Za-z_][A-Za-z0-9_]*)=(-?[\d.eE+-]+)$/.exec(t);
+        if (m) valeurs.set(m[1], Number(m[2]));
+      }
+      mdl.etats.push({ nom: p[1], valeurs, ligne: num });
       return;
     }
     if (p[0] === "~sortie") {                    // routage d'une sortie (studio seulement)
@@ -3279,6 +3355,7 @@ class Simulateur {
     });
     this.entrees = Int32Array.from(desc.entrees.map(e => e.i));
     this.impulsion = null;                   // {reste, duree, amp}
+    this._tr = null; this._compteTr = 0;     // transition de coefficients en cours
     this.reset();
   }
 
@@ -3297,6 +3374,60 @@ class Simulateur {
     this.u.set(autre.u); this.ur.set(autre.ur); this.f.set(autre.f);
     this.cible.set(autre.cible); this.vitesse.set(autre.vitesse);
     return true;
+  }
+
+  /* Comme adopter(), mais les coefficients (raideurs, masses, positions des
+   * proxies...) glissent de leurs anciennes valeurs aux nouvelles en nEch pas :
+   * bouger un curseur ne fait plus de saut (donc plus de clic). */
+  transitionDepuis(ancien, nEch) {
+    if (!this.adopter(ancien)) return false;
+    if (nEch < 8 || ancien.code.length !== this.code.length) return true;
+    const champs = ["A", "B", "invM", "grav", "args", "dec"];
+    const de = {}, vers = {};
+    for (const c of champs) { de[c] = Float64Array.from(ancien[c]); vers[c] = Float64Array.from(this[c]); this[c].set(de[c]); }
+    // proxies : poids sur l'union des anciens et nouveaux points
+    let proxies = null;
+    const np = this.pDebut.length - 1;
+    if (np > 0 && ancien.pDebut.length - 1 === np) {
+      const fin = { pDebut: this.pDebut, pNoeud: this.pNoeud, pPoids: this.pPoids };
+      const deb = [0], noe = [], pde = [], pve = [];
+      for (let k = 0; k < np; k++) {
+        const poids = new Map();
+        for (let j = ancien.pDebut[k]; j < ancien.pDebut[k + 1]; j++) {
+          const n = ancien.pNoeud[j], w = ancien.pPoids[j];
+          poids.set(n, [(poids.get(n) || [0, 0])[0] + w, 0]);
+        }
+        for (let j = this.pDebut[k]; j < this.pDebut[k + 1]; j++) {
+          const n = this.pNoeud[j], w = this.pPoids[j], q = poids.get(n) || [0, 0];
+          poids.set(n, [q[0], q[1] + w]);
+        }
+        for (const [n, [a, b]] of poids) { noe.push(n); pde.push(a); pve.push(b); }
+        deb.push(noe.length);
+      }
+      this.pDebut = Int32Array.from(deb); this.pNoeud = Int32Array.from(noe);
+      this.pPoids = Float64Array.from(pde);
+      proxies = { de: Float64Array.from(pde), vers: Float64Array.from(pve), fin };
+    }
+    this._tr = { k: 0, n: nEch, champs, de, vers, proxies };
+    return true;
+  }
+
+  _avanceTransition() {
+    const tr = this._tr;
+    tr.k += 8;
+    const t = Math.min(tr.k / tr.n, 1);
+    for (const c of tr.champs) {
+      const a = this[c], de = tr.de[c], vers = tr.vers[c];
+      for (let i = 0; i < a.length; i++) a[i] = de[i] + (vers[i] - de[i]) * t;
+    }
+    if (tr.proxies) {
+      const w = this.pPoids, de = tr.proxies.de, vers = tr.proxies.vers;
+      for (let i = 0; i < w.length; i++) w[i] = de[i] + (vers[i] - de[i]) * t;
+    }
+    if (t >= 1) {
+      if (tr.proxies) Object.assign(this, tr.proxies.fin);
+      this._tr = null;
+    }
   }
 
   /* impulsion de vitesse (bouton Frapper) sur un point ou un proxy */
@@ -3359,6 +3490,7 @@ class Simulateur {
   }
 
   _unPas() {
+    if (this._tr && (this._compteTr = (this._compteTr + 1) & 7) === 0) this._avanceTransition();
     const { u, ur, f, etat, A, B, invM, grav, cible, lissage, n } = this;
     // 1) masses (et entrees pilotees)
     for (let i = 0; i < n; i++) {
@@ -3537,6 +3669,15 @@ class NoyauSon {
     this.mix = new Float64Array(32);
     this.charge = 0;                               // part du temps reel utilisee
     this.routes = [];                              // [{i, frc, gains[canal]}]
+    this.fluidite = 40;                            // ms : glissement des reglages et de la bille
+    this.coupeBas(30);
+  }
+
+  /* filtre coupe-bas (anti-continu) : sous cette frequence le son est attenue.
+   * Monter a 60-120 Hz evite que les petits haut-parleurs saturent sur les basses. */
+  coupeBas(hz) {
+    this.hpHz = Math.min(Math.max(hz || 20, 5), 400);
+    this.hpR = Math.exp(-2 * Math.PI * this.hpHz / this.sr);
   }
 
   message(d) {
@@ -3544,7 +3685,9 @@ class NoyauSon {
       case "modele": {
         const ancien = this.sim;
         this.sim = d.desc ? new Simulateur(d.desc) : null;
-        if (!(d.garder && this.sim && this.sim.adopter(ancien))) { this.dc.fill(0); this.env = 0; }
+        if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.fluidite, 2) * this.sr / 1000));
+        const garde = d.garder && this.sim && this.sim.transitionDepuis(ancien, Math.round(this.fluidite * this.sr / 1000));
+        if (!garde) { this.dc.fill(0); this.env = 0; }
         this._routage();
         break;
       }
@@ -3559,6 +3702,11 @@ class NoyauSon {
       case "entrainer": if (this.sim) this.sim.entrainer(d.i, d.v); break;
       case "reset": if (this.sim) this.sim.reset(); this.dc.fill(0); this.env = 0; break;
       case "gain": this.gain = d.v; this.auto = d.auto !== false; break;
+      case "options":                                // fluidite (ms), coupe-bas (Hz)
+        this.fluidite = d.fluidite;
+        if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.fluidite, 2) * this.sr / 1000));
+        this.coupeBas(d.coupeBas);
+        break;
     }
   }
 
@@ -3604,7 +3752,7 @@ class NoyauSon {
       // filtre anti-continu par canal, puis volume auto et limiteur doux
       let a = 0;
       for (let c = 0; c < C; c++) {
-        const y = mix[c] - dc[2 * c] + 0.995 * dc[2 * c + 1];
+        const y = mix[c] - dc[2 * c] + this.hpR * dc[2 * c + 1];
         dc[2 * c] = mix[c]; dc[2 * c + 1] = y; mix[c] = y;
         a = Math.max(a, Math.abs(y));
       }
@@ -3636,7 +3784,7 @@ const son = {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) throw new Error("ce navigateur ne gere pas le son (Web Audio)");
-      this.ctx = new AC({ latencyHint: "interactive" });
+      this.ctx = new AC({ latencyHint: this.latence || "interactive" });
       await this._construitNoeud();
     }
     await this.ctx.resume();
@@ -3734,6 +3882,17 @@ registerProcessor("mims-son", MimsProcesseur);`;
     this.actif = false;
     this.envoyer({ type: "modele", desc: null });
     if (this.ctx) await this.ctx.suspend();
+  },
+
+  /* change la latence : il faut recreer le contexte audio */
+  async changerLatence(l) {
+    this.latence = l;
+    if (!this.ctx) return false;
+    const etait = this.actif;
+    try { await this.ctx.close(); } catch (e) { /* deja ferme */ }
+    this.ctx = null; this.noeud = null; this.noyau = null; this.actif = false;
+    if (etait) await this.demarrer();
+    return etait;
   },
 
   get frequence() { return this.ctx ? this.ctx.sampleRate : 0; },
@@ -4649,7 +4808,7 @@ const MODELES_PRETS = [
     id: "corde-pincee", titre: "Corde pincée",
     desc: "Corde intégrée de 60 masses. Glisse la bille jaune à travers la corde pour la pincer ; règle le point de pincement et d'écoute.",
     script: () => `# Corde pincee (structure integree + proxies)
-@corde_K param 0.3
+@corde_hz param 110
 @corde_Z param 0.0004
 @corde_Zo param 0.00002
 @pince_pos param 0.27
@@ -4657,8 +4816,11 @@ const MODELES_PRETS = [
 @pince_K param 0.5
 @pince_echelle param 0.1
 
-@corde string 60 1. corde_K corde_Z corde_Zo 0. 0.
-@in1 posInput 0.
+# la raideur est calculee depuis la note voulue (corde_hz) : baisser la note
+# = une corde virtuellement plus longue, sans ajouter de masses
+@corde string 60 1. [pow(3.14159*corde_hz/(44100*sin(3.14159/118)),2)] corde_Z corde_Zo 0. 0.
+# la bille demarre 0.3 au-dessus (hors de portee) : sinon elle tient la corde
+@in1 posInput 0.3
 @pince nlPluck [@corde pince_pos] @in1 pince_K pince_echelle 0.001
 @out1 posOutput [@corde ecoute_pos]
 @out2 posOutput [@corde 0.5]
@@ -4692,13 +4854,13 @@ const MODELES_PRETS = [
     id: "corde-marteau", titre: "Corde au marteau",
     desc: "Un marteau (oscillateur) au-dessus de la corde, poussé par une entrée de force : Frapper (ou espace) le lance.",
     script: () => `# Corde frappee par un marteau
-@corde_K param 0.25
+@corde_hz param 98
 @corde_Z param 0.0003
 @corde_Zo param 0.00003
 @frappe_pos param 0.15
 @ecoute_pos param 0.7
 
-@corde string 50 1. corde_K corde_Z corde_Zo 0. 0.
+@corde string 50 1. [pow(3.14159*corde_hz/(44100*sin(3.14159/98)),2)] corde_Z corde_Zo 0. 0.
 @marteau osc 3. 0.0005 0.003 0. 0.
 @choc contact [@corde frappe_pos] @marteau 0.2 0.01 -1.5
 @in1 frcInput @marteau
@@ -4734,16 +4896,16 @@ const MODELES_PRETS = [
     id: "corde-membrane", titre: "Corde + membrane couplées",
     desc: "Une corde pincée transmet sa vibration à une membrane par un ressort, comme un chevalet sur une table d'harmonie.",
     script: () => `# Corde pincee couplee a une membrane (chevalet)
-@corde_K param 0.3
+@corde_hz param 147
 @corde_Z param 0.0004
 @peau_K param 0.1
 @peau_Z param 0.0008
 @couplage_K param 0.02
 @pince_pos param 0.3
 
-@corde string 50 1. corde_K corde_Z 0.00002 0. 0.
+@corde string 50 1. [pow(3.14159*corde_hz/(44100*sin(3.14159/98)),2)] corde_Z 0.00002 0. 0.
 @table cornerMesh 12 9 2. peau_K peau_Z 0.00005 0. 0.
-@in1 posInput 0.
+@in1 posInput 0.3
 @pince nlPluck [@corde pince_pos] @in1 0.5 0.1 0.001
 @chevalet springDamper [@corde 0.9] [@table 0.5 0.5] couplage_K 0.0001
 @out1 posOutput [@table 0.3 0.7]
@@ -4806,13 +4968,17 @@ const BRIQUES = {
   corde: {
     titre: "Corde", desc: "Corde intégrée mi-gen (extrémités fixes). Raide = plus brillante, chaîne = libre aux deux bouts.",
     champs: { genre: ["type", "string", ["string", "stiffString", "chain"]], n: ["masses", 50, 3, 1000],
-              M: ["masse", 1, 0.01, 100], K: ["raideur K", 0.3, 0.0001, 1], Z: ["amortissement Z", 0.0004, 0, 0.1],
+              hz: ["note en Hz (corde simple)", 110, 10, 2000],
+              M: ["masse", 1, 0.01, 100], K: ["raideur K (raide / chaîne)", 0.3, 0.0001, 1], Z: ["amortissement Z", 0.0004, 0, 0.1],
               Zo: ["frein vers le repos Zo", 0.00002, 0, 0.1], K2: ["raideur de flexion K2 (corde raide)", 0.1, 0, 1] },
     lignes(mdl, v, vue) {
       const nom = nomLibre(mdl, v.genre === "chain" ? "chaine" : "corde"), y = rangeeLibre(vue);
       const L = Math.min(Math.max(v.n * 0.35, 8), 30);
-      const p = [`@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`];
-      let def = `@${nom} ${v.genre} ${v.n | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
+      const accorde = v.genre === "string";
+      const p = [accorde ? `@${nom}_hz param ${v.hz}` : `@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`];
+      let def = accorde
+        ? `@${nom} string ${v.n | 0} ${v.M} ${raideurPourNote(nom, v.n | 0, v.M)} ${nom}_Z ${nom}_Zo 0. 0.`
+        : `@${nom} ${v.genre} ${v.n | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
       if (v.genre === "stiffString") { p.push(`@${nom}_K2 param ${v.K2}`); def = `@${nom} stiffString ${v.n | 0} ${v.M} ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`; }
       return { params: p, corps: [def], geo: [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 4 ${f2(L / 2)} ${f2(y)} 4`] };
     },
@@ -4907,7 +5073,8 @@ function lignesExcitation(mdl, desc, i, mode) {
   const base = { frapper: "frappe", pincer: "pince", frotter: "archet" }[mode];
   const cible = refAvecParams(mdl, desc, i, base, params);
   const nom = nomLibre(mdl, base);
-  corps.push(`@${entree} posInput 0.`);
+  // pincer : la bille demarre hors de portee (0.3 > echelle 0.1), sinon elle retient la corde
+  corps.push(`@${entree} posInput ${mode === "pincer" ? "0.3" : "0."}`);
   if (mode === "frapper") {
     corps.push(`@${nom} contact ${cible} @${entree} 0.1 0.002 -3`);
     geo.push(`~pos @${entree} ${f2(g[0])} ${f2(g[1])} ${f2(g[2] + 3)}`);
@@ -5712,13 +5879,25 @@ function lignesLien(mdl, desc, i, j) {
   return { params, corps: [`@${nom} springDamper ${a} ${b} liens_K liens_Z`], geo: [] };
 }
 
+/* raideur d'une corde (extremites fixes, n masses de 1) pour que sa note
+ * fondamentale soit @nom_hz : f = 44100/pi * sqrt(K) * sin(pi / (2 (n-1))).
+ * Expression gen~ valide : elle s'exporte telle quelle vers Max. */
+function raideurPourNote(nom, n, M = 1) {
+  return `[${M === 1 ? "" : M + "*"}pow(3.14159*${nom}_hz/(44100*sin(3.14159/${2 * (n - 1)})),2)]`;
+}
+
 /* corde integree tracee de p0 a p1 ; membrane dans le rectangle p0-p1 */
 function lignesCorde(mdl, p0, p1, genre = "string") {
   const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
   const n = Math.min(Math.max(Math.round(L * 2.5), 8), 200);
   const nom = nomLibre(mdl, genre === "chain" ? "chaine" : "corde");
-  const params = [`@${nom}_K param 0.3`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`];
-  let def = `@${nom} ${genre} ${n} 1. ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
+  // corde : accordee en Hz (la raideur K en decoule) ; chaine / corde raide : raideur K
+  const params = genre === "string"
+    ? [`@${nom}_hz param 110`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`]
+    : [`@${nom}_K param 0.3`, `@${nom}_Z param 0.0004`, `@${nom}_Zo param 0.00002`];
+  let def = genre === "string"
+    ? `@${nom} string ${n} 1. ${raideurPourNote(nom, n)} ${nom}_Z ${nom}_Zo 0. 0.`
+    : `@${nom} ${genre} ${n} 1. ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
   if (genre === "stiffString") {
     params.push(`@${nom}_K2 param 0.1`);
     def = `@${nom} stiffString ${n} 1. ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`;
@@ -5922,6 +6101,7 @@ const app = {
     this._brancheEdition();
     this._brancheEcoute();
     this._brancheSecours();
+    this._brancheJeu();
     tuto.init();
     $("sld-ampli").value = 10;
     this.charger(MODELES_PRETS[0].script(), "corde-pincee.mdl");
@@ -5979,7 +6159,11 @@ const app = {
       if (!this.modele) return;
       this.desc = compiler(this.modele, { reglages: this.reglagesAudio });
       this.vue.charger(this.desc, true);
-      if (this.anime) { const s = new Simulateur(this.desc); s.adopter(this.sim); this.sim = s; }
+      if (this.anime) {
+        const s = new Simulateur(this.desc);
+        s.transitionDepuis(this.sim, Math.round(this.options.fluidite * 44.1));
+        s.lissage = this.sim.lissage; this.sim = s;
+      }
       if (son.actif) this._envoieModeleSon(true);
       this._appliqueArchet();
     });
@@ -6349,6 +6533,7 @@ const app = {
     btn.textContent = "🔊 Son"; btn.classList.add("actif");
     $("lbl-vitesse").classList.add("grise");
     this._envoieVolume();
+    this._envoieOptions();
     if (son.multi) this._modeCanaux();
     this._envoieModeleSon(false);
     this._appliqueArchet();
@@ -6978,6 +7163,7 @@ Object.assign(app, {
  * ------------------------------------------------------------------ */
 
 const LEGENDE = {
+  note: ["note", "hauteur de la corde en Hz : plus bas = corde virtuellement plus longue (sans ajouter de masses)"],
   M: ["masse", "inertie d'un point : plus lourd = plus grave et plus lent"],
   K: ["raideur", "force de rappel d'un ressort : plus raide = plus aigu (fréquence ≈ √(K/M))"],
   Z: ["amortissement", "frottement interne d'une liaison : plus grand = son plus court et plus mat"],
@@ -6997,7 +7183,7 @@ const LEGENDE = {
   nbX: ["masses en x", "taille de la membrane"], nbY: ["masses en y", "taille de la membrane"],
   position: ["position", "point visé sur une corde ou une membrane : 0 = un bout, 1 = l'autre"],
 };
-const ORDRE_LEGENDE = ["M", "K", "Z", "Zo", "K2", "Knl", "Pscale", "Znl", "Vscale", "thresh", "position", "nbMass"];
+const ORDRE_LEGENDE = ["note", "M", "K", "Z", "Zo", "K2", "Knl", "Pscale", "Znl", "Vscale", "thresh", "position", "nbMass"];
 
 app._construitReglagesBase = app._construitReglages;
 
@@ -7010,6 +7196,7 @@ Object.assign(app, {
       if (!token) return;
       for (const n of String(token).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
         if (!mdl.params.has(n)) continue;
+        if (/_hz$/.test(n) && role === "K") role = "note";      // corde accordee : la note donne K
         if (!roles.has(n)) roles.set(n, []);
         const r = roles.get(n);
         if (!r.some(x => x.role === role && x.ou === ou)) r.push({ role, ou });
@@ -7023,7 +7210,8 @@ Object.assign(app, {
     for (const mc of mdl.macros.values()) args(mc.genre, mc.args, "@" + mc.nom);
     for (const it of mdl.interactions) {
       args(it.genre, it.args, `${it.genre} @${it.nom}`);
-      for (const r of [it.m1, it.m2]) if (r.macro !== undefined) { note(r.a, "position", "@" + r.macro); note(r.b, "position", "@" + r.macro); }
+      // une position sur une structure appartient a l'interaction qui l'utilise
+      for (const r of [it.m1, it.m2]) if (r.macro !== undefined) { note(r.a, "position", `${it.genre} @${it.nom}`); note(r.b, "position", `${it.genre} @${it.nom}`); }
     }
     for (const s of [...mdl.sorties, ...mdl.entrees])
       if (s.cible.macro !== undefined) { note(s.cible.a, "position", `@${s.nom}`); note(s.cible.b, "position", `@${s.nom}`); }
@@ -7117,6 +7305,432 @@ Object.assign(app, {
       ? `${auto ? "💥 Le modèle a explosé : " : ""}retour aux derniers réglages stables (${changes.map(([n, v]) => `${n} = ${v}`).join(", ")})`
       : auto ? "💥 Le modèle a explosé et a été remis au repos. Baisse une raideur K, monte une masse M ou un amortissement Z."
              : "modèle remis au repos");
+  },
+});
+
+
+/* ===== 77-calques.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Reglages en calques : un volet par objet (corde, membrane,         *
+ *  pincement, ecoute...), parametres essentiels en premier, le reste  *
+ *  sous « options ». Favoris epingles en haut (~favoris), etats       *
+ *  memorises (~etat), zone rouge = limite de stabilite estimee.       *
+ * ------------------------------------------------------------------ */
+
+const PRIORITE_ROLE = { note: 0, K: 0, position: 0, Znl: 0, Knl: 1, Z: 1, M: 2, Zo: 2, K2: 1, Vscale: 2, Pscale: 2,
+                        KnlP: 2, KnlQ: 2, Klim: 3, thresh: 3, gravity: 3, smooth: 3, nbMass: 3, nbX: 3, nbY: 3 };
+const ICONES = { string: "〰", stiffString: "〰", chain: "⛓", mesh: "▦", closedMesh: "▦", cornerMesh: "▦",
+                 mass: "●", osc: "◉", ground: "■", nlPluck: "✋", nlBow: "🎻", contact: "✊", nlContact: "✊",
+                 springDamper: "╱", spring: "╱", damper: "╱", posOutput: "🎧", frcOutput: "🎧", frcInput: "⚡" };
+// roles qui changent la stabilite du calcul : on cherche leur limite
+const ROLES_STABILITE = new Set(["note", "K", "M", "Z", "Zo", "K2", "Knl", "Klim", "Znl"]);
+
+Object.assign(app, {
+  _calquesFermes: new Set(),
+
+  /* objet "proprietaire" de chaque element nomme : son type et son libelle */
+  _proprietaires() {
+    const mdl = this.modele, info = new Map();
+    for (const m of mdl.masses.values()) info.set("@" + m.nom, { genre: m.genre, titre: AIDE_TYPES[m.genre] || m.genre });
+    for (const mc of mdl.macros.values()) info.set("@" + mc.nom, { genre: mc.genre, titre: AIDE_TYPES[mc.genre] });
+    for (const it of mdl.interactions) info.set(`${it.genre} @${it.nom}`, { genre: it.genre, titre: AIDE_TYPES[it.genre] || it.genre, nom: it.nom });
+    for (const s of mdl.sorties) info.set("@" + s.nom, { genre: s.genre, titre: "point d'écoute" });
+    return info;
+  },
+
+  _construitReglages() {
+    const zone = $("liste-reglages");
+    zone.innerHTML = "";
+    const mdl = this.modele;
+    this._construitEtats();
+    const roles = this._rolesParams();
+    this._construitLegende(roles);
+    if (!mdl.params.size) {
+      zone.innerHTML = `<p class="aide">Ce modèle n'a pas de @param. Écris « @nom param valeur » dans le script et
+        utilise ce nom comme valeur : il devient un curseur ici.</p>`;
+      this._majStabilite();
+      return;
+    }
+    // regroupement par objet : le premier endroit ou le param sert
+    const info = this._proprietaires(), groupes = new Map();
+    const ajoute = (cle, p) => { if (!groupes.has(cle)) groupes.set(cle, []); groupes.get(cle).push(p); };
+    for (const p of mdl.params.values()) {
+      const r = roles.get(p.nom) || [];
+      const proprios = [...new Set(r.map(x => x.ou))];
+      if (p.genre === "audioParam") ajoute("audio", p);
+      else if (!proprios.length) ajoute("autres", p);
+      else if (proprios.length > 1 && !r.every(x => x.role === "position")) ajoute(proprios.length > 3 ? "partages" : proprios[0], p);
+      else ajoute(proprios[0], p);
+    }
+    const prio = p => Math.min(...(roles.get(p.nom) || [{ role: "?" }]).map(x => PRIORITE_ROLE[x.role] ?? 3));
+
+    // favoris
+    const favoris = mdl.favoris.filter(n => mdl.params.has(n));
+    if (favoris.length) zone.appendChild(this._calque("⭐", "Favoris", "épinglés", favoris.map(n => mdl.params.get(n)), roles, true, "favoris"));
+
+    // ordre : structures, puis excitations, liens, ecoutes, le reste
+    const rang = cle => {
+      const g = (info.get(cle) || {}).genre || "";
+      if (TYPES_MACRO.includes(g)) return 0;
+      if (["nlPluck", "nlBow", "contact", "nlContact"].includes(g)) return 1;
+      if (["mass", "osc"].includes(g)) return 2;
+      if (["springDamper", "spring", "damper"].includes(g)) return 3;
+      if (g === "posOutput" || g === "frcOutput") return 4;
+      return 5;
+    };
+    for (const cle of [...groupes.keys()].sort((a, b) => rang(a) - rang(b))) {
+      const liste = groupes.get(cle).sort((a, b) => prio(a) - prio(b));
+      let icone = "•", titre, sous;
+      if (cle === "audio") { icone = "🎚"; titre = "Entrées audio"; sous = "audioParam (une entrée inN dans Max)"; }
+      else if (cle === "autres") { titre = "Autres paramètres"; sous = ""; }
+      else if (cle === "partages") { icone = "⇄"; titre = "Paramètres partagés"; sous = "utilisés par plusieurs objets"; }
+      else {
+        const i = info.get(cle) || {};
+        icone = ICONES[i.genre] || "•";
+        titre = cle.replace(/^\S+ (?=@)/, "");
+        sous = i.titre || "";
+      }
+      zone.appendChild(this._calque(icone, titre, sous, liste, roles, false, cle));
+    }
+    this._majStabilite();
+    clearTimeout(this._idLimites);
+    this._idLimites = setTimeout(() => this._calculeLimites(), 200);
+  },
+
+  _calque(icone, titre, sous, liste, roles, estFavoris, cle) {
+    const div = document.createElement("div");
+    div.className = "calque" + (estFavoris ? " favoris" : "") + (this._calquesFermes.has(cle) ? " ferme" : "");
+    const tete = document.createElement("div");
+    tete.className = "entete";
+    tete.innerHTML = `<span class="fleche"></span><span></span><b></b><span class="type"></span>`;
+    tete.children[0].textContent = this._calquesFermes.has(cle) ? "▸" : "▾";
+    tete.children[1].textContent = icone;
+    tete.children[2].textContent = titre;
+    tete.children[3].textContent = sous;
+    tete.addEventListener("click", () => {
+      const ferme = div.classList.toggle("ferme");
+      tete.children[0].textContent = ferme ? "▸" : "▾";
+      if (ferme) this._calquesFermes.add(cle); else this._calquesFermes.delete(cle);
+    });
+    // survol : montre l'objet dans la vue
+    const nomEl = (titre.match(/@(\S+)/) || [])[1];
+    if (nomEl) tete.addEventListener("mouseenter", () => {
+      const k = this.desc.element.findIndex(e => e === nomEl);
+      if (k >= 0) { this.vue.choisir(k); }
+    });
+    const corps = document.createElement("div");
+    corps.className = "corps";
+    const essentiels = estFavoris ? liste : liste.filter((p, k) => k < 2 || (PRIORITE_ROLE[((roles.get(p.nom) || [])[0] || {}).role] ?? 3) <= 1);
+    const options = estFavoris ? [] : liste.filter(p => !essentiels.includes(p));
+    for (const p of essentiels) corps.appendChild(this._ligneReglage(p, roles));
+    if (options.length) {
+      const det = document.createElement("details");
+      det.className = "options-calque";
+      det.innerHTML = `<summary>options (${options.length})</summary>`;
+      for (const p of options) det.appendChild(this._ligneReglage(p, roles));
+      corps.appendChild(det);
+    }
+    div.append(tete, corps);
+    return div;
+  },
+
+  /* une ligne : etoile, nom, curseur (+ zone rouge), valeur libre, retour */
+  _ligneReglage(p, roles) {
+    const r = (roles && roles.get(p.nom)) || [];
+    const lineaire = p.genre === "audioParam" || (r.length && r.every(x => x.role === "position"));
+    const row = document.createElement("div");
+    row.className = "reglage";
+    row.dataset.param = p.nom;
+    const et = document.createElement("button");
+    et.className = "etoile" + (this.modele.favoris.includes(p.nom) ? " on" : "");
+    et.textContent = "★"; et.title = "épingler en haut (favori)";
+    et.addEventListener("click", () => this.basculeFavori(p.nom));
+    const lab = document.createElement("label");
+    lab.textContent = p.nom;
+    lab.title = r.map(x => `${x.role} (${(LEGENDE[x.role] || [x.role])[0]}) de ${x.ou}`).join("\n") || p.nom;
+    const zoneC = document.createElement("div"); zoneC.className = "curseur";
+    const sld = document.createElement("input");
+    sld.type = "range"; sld.min = 0; sld.max = 1000; sld.step = 1;
+    const rouge = document.createElement("div"); rouge.className = "rouge"; rouge.hidden = true;
+    zoneC.append(sld, rouge);
+    const num = document.createElement("input");
+    num.type = "number"; num.step = "any"; num.title = "valeur libre (même hors de la plage du curseur)";
+    const raz = document.createElement("button");
+    raz.className = "raz"; raz.textContent = "↺"; raz.title = "valeur de départ";
+    const v0 = this.valeursInitiales.has(p.nom) ? this.valeursInitiales.get(p.nom) : p.valeur;
+    const valeur = p.genre === "audioParam" ? (this.reglagesAudio.has(p.nom) ? this.reglagesAudio.get(p.nom) : 0.5) : p.valeur;
+    // plage : 0..1 pour les positions ; sinon logarithmique, de v0/100 a v0*100
+    let vers, depuis;
+    if (lineaire) { vers = v => v * 1000; depuis = c => c / 1000; }
+    else if (v0 > 0) {
+      const lo = Math.log(v0 / 100), hi = Math.log(v0 * 100);
+      vers = v => (Math.log(Math.max(v, 1e-30)) - lo) / (hi - lo) * 1000;
+      depuis = c => +Math.exp(lo + (hi - lo) * c / 1000).toPrecision(4);
+    } else {
+      const a = Math.max(Math.abs(v0) * 10, 1);
+      vers = v => (v + a) / (2 * a) * 1000; depuis = c => +(c / 1000 * 2 * a - a).toPrecision(4);
+    }
+    row._echelle = { vers, depuis, lineaire };
+    sld.value = vers(valeur);
+    num.value = +(+valeur).toPrecision(6);
+    const libre = /^-?[\d.eE+-]+$/.test(p.brut) || p.genre === "audioParam";
+    if (!libre) { sld.disabled = true; num.disabled = true; lab.title += `\n= ${p.brut} (expression : modifiable dans le script)`; }
+    const applique = v => { if (Number.isFinite(v)) { this.changerParam(p.nom, v); this._marqueDanger(row, v); } };
+    sld.addEventListener("input", () => { const v = depuis(+sld.value); num.value = v; applique(v); });
+    num.addEventListener("change", () => { const v = +num.value; sld.value = vers(v); applique(v); });
+    raz.addEventListener("click", () => { num.value = v0; sld.value = vers(v0); applique(v0); });
+    row.append(et, lab, zoneC, num, raz);
+    if (r.length) {
+      const d = document.createElement("div");
+      d.className = "role";
+      d.textContent = [...new Set(r.map(x => `${x.role} — ${(LEGENDE[x.role] || [x.role])[0]}`))].join(" ; ");
+      row.appendChild(d);
+    }
+    return row;
+  },
+
+  /* mise a jour des curseurs apres un rappel d'etat ou un secours */
+  _rafraichitCurseurs() {
+    document.querySelectorAll("#liste-reglages .reglage").forEach(row => {
+      const p = this.modele.params.get(row.dataset.param);
+      if (!p || !row._echelle) return;
+      const v = p.genre === "audioParam" ? (this.reglagesAudio.get(p.nom) ?? 0.5) : p.valeur;
+      row.querySelector("input[type=range]").value = row._echelle.vers(v);
+      row.querySelector("input[type=number]").value = +(+v).toPrecision(6);
+      this._marqueDanger(row, v);
+    });
+  },
+
+  /* ---------------- limite de stabilite sur chaque curseur ---------------- */
+
+  _rapportAvec(nom, v) {
+    const reg = new Map(this.reglagesAudio);
+    reg.set(nom, v);
+    return margeStabilite(compiler(this.modele, { reglages: reg })).rapport;
+  },
+
+  /* pour chaque parametre physique : valeur ou le calcul devient instable
+   * (dichotomie sur la plage du curseur), dessinee en rouge sous le curseur */
+  _calculeLimites() {
+    const lignes = [...document.querySelectorAll("#liste-reglages .reglage")];
+    const roles = this._rolesParams();
+    const suivant = () => {
+      const row = lignes.shift();
+      if (!row) return;
+      const nom = row.dataset.param, p = this.modele && this.modele.params.get(nom);
+      const r = roles.get(nom) || [];
+      if (p && p.genre === "param" && row._echelle && !row._echelle.lineaire && r.some(x => ROLES_STABILITE.has(x.role))) {
+        const { depuis } = row._echelle;
+        try {
+          const rLo = this._rapportAvec(nom, depuis(0)), rHi = this._rapportAvec(nom, depuis(1000));
+          const rouge = row.querySelector(".rouge");
+          if ((rLo >= 1) !== (rHi >= 1)) {
+            let a = 0, b = 1000;
+            for (let k = 0; k < 10; k++) {
+              const m = (a + b) / 2, rm = this._rapportAvec(nom, depuis(m));
+              if ((rm >= 1) === (rLo >= 1)) a = m; else b = m;
+            }
+            const x = (a + b) / 20;                       // en %
+            const versLaDroite = rHi >= 1;
+            rouge.style.left = versLaDroite ? `${x}%` : "0%";
+            rouge.style.width = versLaDroite ? `${100 - x}%` : `${x}%`;
+            rouge.hidden = false;
+            row._limite = { valeur: depuis((a + b) / 2), versLaDroite };
+            rouge.title = `au-delà de ${row._limite.valeur.toPrecision(3)} le calcul devient instable (estimation)`;
+          } else if (rLo >= 1) { rouge.style.left = "0%"; rouge.style.width = "100%"; rouge.hidden = false; row._limite = null; }
+          else { rouge.hidden = true; row._limite = null; }
+          this._marqueDanger(row, p.valeur);
+        } catch (e) { /* modele en cours d'edition */ }
+      }
+      setTimeout(suivant, 0);
+    };
+    suivant();
+  },
+
+  _marqueDanger(row, v) {
+    const l = row._limite;
+    row.classList.toggle("danger", !!l && (l.versLaDroite ? v >= l.valeur : v <= l.valeur));
+  },
+
+  /* ---------------- favoris ---------------- */
+
+  basculeFavori(nom) {
+    const f = new Set(this.modele.favoris);
+    if (f.has(nom)) f.delete(nom); else f.add(nom);
+    const lignes = $("editeur").value.replace(/\s+$/, "").split("\n").filter(l => !/^\s*~favoris\b/.test(l));
+    if (f.size) lignes.push(`~favoris ${[...f].join(" ")}`);
+    this.modifierTexte(lignes.join("\n") + "\n");
+    this.onglet("reglages");
+  },
+
+  /* ---------------- legende ---------------- */
+
+  _construitLegende(roles) {
+    const presents = new Set([...roles.values()].flat().map(x => x.role));
+    const dl = $("liste-legende");
+    dl.innerHTML = "";
+    for (const k of [...ORDRE_LEGENDE.filter(k => presents.has(k)), ...ORDRE_LEGENDE.filter(k => !presents.has(k))]) {
+      const dt = document.createElement("dt"), dd = document.createElement("dd");
+      dt.textContent = k; dd.textContent = `${LEGENDE[k][0]} : ${LEGENDE[k][1]}`;
+      if (!presents.has(k)) { dt.style.opacity = dd.style.opacity = 0.5; }
+      dl.append(dt, dd);
+    }
+  },
+
+  /* ---------------- etats memorises (~etat) ---------------- */
+
+  _construitEtats() {
+    const zone = $("liste-etats");
+    zone.innerHTML = "";
+    for (const e of this.modele.etats) {
+      const b = document.createElement("span");
+      b.className = "puce etat";
+      b.title = [...e.valeurs].map(([k, v]) => `${k} = ${v}`).join("\n");
+      const t = document.createElement("span"); t.textContent = e.nom;
+      const x = document.createElement("span"); x.className = "x"; x.textContent = "✕"; x.title = "oublier cet état";
+      b.append(t, x);
+      t.addEventListener("click", () => this.rappelerEtat(e));
+      t.addEventListener("dblclick", () => {
+        const n = prompt("Nom de l'état :", e.nom);
+        if (n && /^\S+$/.test(n)) this._remplaceLigneEtat(e, `~etat ${n} ${this._texteValeurs(e.valeurs)}`);
+      });
+      x.addEventListener("click", () => this._remplaceLigneEtat(e, null));
+      zone.appendChild(b);
+    }
+    if (!this.modele.etats.length)
+      zone.innerHTML = `<span class="discret">Aucun état : règle le son, puis 📸 pour le retrouver plus tard (il est enregistré dans le .mdl).</span>`;
+  },
+
+  _texteValeurs(valeurs) { return [...valeurs].map(([k, v]) => `${k}=${+(+v).toPrecision(6)}`).join(" "); },
+
+  memoriserEtat() {
+    const v = this._valeursParams();
+    let n = 1;
+    const noms = new Set(this.modele.etats.map(e => e.nom));
+    while (noms.has(`etat${n}`)) n++;
+    const lignes = $("editeur").value.replace(/\s+$/, "").split("\n");
+    lignes.push(`~etat etat${n} ${this._texteValeurs(v)}`);
+    this.modifierTexte(lignes.join("\n") + "\n");
+    this.onglet("reglages");
+    this.statut(`état « etat${n} » mémorisé (${v.size} réglages) — Ctrl+S pour l'enregistrer dans le .mdl`);
+  },
+
+  _remplaceLigneEtat(e, nouvelle) {
+    const lignes = $("editeur").value.split("\n");
+    if (nouvelle === null) lignes.splice(e.ligne - 1, 1); else lignes[e.ligne - 1] = nouvelle;
+    this.modifierTexte(lignes.join("\n"));
+    this.onglet("reglages");
+  },
+
+  /* revient a un etat : les valeurs glissent (fluidite), le son continue */
+  rappelerEtat(e) {
+    let n = 0;
+    for (const [k, v] of e.valeurs) {
+      const p = this.modele.params.get(k);
+      if (!p) continue;
+      if (p.genre === "audioParam") this.reglagesAudio.set(k, v);
+      else {
+        p.brut = String(v); p.valeur = v;
+        $("editeur").value = $("editeur").value.replace(new RegExp(`^(\\s*@${k}\\s+param\\s+)(\\S+)`, "m"), `$1${v}`);
+      }
+      n++;
+    }
+    for (const q of this.modele.params.values())
+      if (q.genre === "param") { try { q.valeur = evalue(q.brut, valeursParams(this.modele)); } catch (err) { /* garde */ } }
+    this._dernierChangement = performance.now();
+    this.rafraichirPhysique();
+    this._rafraichitCurseurs();
+    this._majStabilite();
+    this.statut(`état « ${e.nom} » rappelé (${n} réglages)`);
+  },
+});
+
+
+/* ===== 78-jeu.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Options de jeu : fluidite (glissement des reglages et de la        *
+ *  bille), frappe aleatoire (force, point), repetition (BPM),         *
+ *  anti-craquements (coupe-bas, latence). Memorisees dans le          *
+ *  navigateur.                                                        *
+ * ------------------------------------------------------------------ */
+
+Object.assign(app, {
+  options: { fluidite: 40, alea: 0, hasard: false, repeter: false, bpm: 120, coupeBas: 30, latence: "interactive" },
+
+  _brancheJeu() {
+    try { Object.assign(this.options, JSON.parse(localStorage.getItem("migen-options") || "{}")); } catch (e) { /* defaut */ }
+    const o = this.options;
+    $("opt-fluidite").value = o.fluidite; $("opt-alea").value = o.alea; $("opt-hasard").checked = o.hasard;
+    $("opt-repeter").checked = o.repeter; $("opt-bpm").value = o.bpm; $("opt-coupebas").value = o.coupeBas;
+    $("opt-latence").value = o.latence; son.latence = o.latence;
+    const lit = () => {
+      o.fluidite = +$("opt-fluidite").value; o.alea = +$("opt-alea").value; o.hasard = $("opt-hasard").checked;
+      o.repeter = $("opt-repeter").checked; o.bpm = Math.min(Math.max(+$("opt-bpm").value || 120, 10), 1200);
+      o.coupeBas = +$("opt-coupebas").value;
+      $("val-fluidite").textContent = `${o.fluidite} ms`; $("val-alea").textContent = `${o.alea} %`;
+      $("val-coupebas").textContent = `${o.coupeBas} Hz`;
+      try { localStorage.setItem("migen-options", JSON.stringify(o)); } catch (e) { /* rien */ }
+      this._envoieOptions();
+      this._majRepetition();
+    };
+    for (const id of ["opt-fluidite", "opt-alea", "opt-hasard", "opt-repeter", "opt-bpm", "opt-coupebas"])
+      $(id).addEventListener("input", lit);
+    $("opt-latence").addEventListener("change", async () => {
+      o.latence = $("opt-latence").value; lit();
+      if (await son.changerLatence(o.latence)) {          // le son tournait : on lui redonne tout
+        if (son.multi) this._modeCanaux();
+        this._envoieVolume(); this._envoieOptions(); this._envoieModeleSon(false); this._appliqueArchet();
+        this.statut(`latence ${$("opt-latence").selectedOptions[0].textContent} — son relancé`);
+      }
+    });
+    $("btn-options").addEventListener("click", e => { e.stopPropagation(); $("options-jeu").hidden = !$("options-jeu").hidden; });
+    document.addEventListener("click", e => { if (!$("options-jeu").contains(e.target) && e.target.id !== "btn-options") $("options-jeu").hidden = true; });
+    $("btn-memoriser").addEventListener("click", () => this.memoriserEtat());
+    lit();
+  },
+
+  _envoieOptions() {
+    son.envoyer({ type: "options", fluidite: this.options.fluidite, coupeBas: this.options.coupeBas });
+    if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.options.fluidite, 2) * 44.1));
+  },
+
+  _majRepetition() {
+    clearInterval(this._idRepetition);
+    this._idRepetition = null;
+    if (!this.options.repeter) { $("btn-frapper").classList.remove("actif"); return; }
+    $("btn-frapper").classList.add("actif");
+    this._idRepetition = setInterval(() => { if (son.actif || this.anime) this.frapper(); }, 60000 / this.options.bpm);
+  },
+
+  /* frappe, avec force aleatoire et point au hasard en option */
+  frapper(cible = null) {
+    if (!this.desc) return;
+    this._assureSimulation();
+    const o = this.options;
+    let force = +$("sld-force").value;
+    if (o.alea > 0) force *= Math.max(0, 1 + (o.alea / 100) * (2 * Math.random() - 1));
+    const d = this.desc;
+    if (cible === null && d.entrees.length) {
+      if (son.actif) son.envoyer({ type: "pousser", force });
+      else if (this.sim) this.sim.pousser(force, 30);
+      return;
+    }
+    const frappable = k => k >= d.nbNoeuds || (k >= 0 && d.etat[k] === MOBILE);
+    let i = cible !== null ? cible : this.vue.selection;
+    if (cible === null && o.hasard) {
+      const mobiles = [];
+      for (let k = 0; k < d.nbNoeuds; k++) if (d.etat[k] === MOBILE) mobiles.push(k);
+      if (mobiles.length) i = mobiles[Math.floor(Math.random() * mobiles.length)];
+    }
+    if (!frappable(i)) {
+      i = -1;
+      for (let k = 0; k < d.nbNoeuds; k++) if (d.etat[k] === MOBILE && (i < 0 || d.gz[k] > d.gz[i])) i = k;
+    }
+    if (i < 0) return;
+    if (son.actif) son.envoyer({ type: "frapper", i, force });
+    else if (this.sim) this.sim.frapper(i, force);
   },
 });
 

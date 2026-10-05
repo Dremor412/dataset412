@@ -10,7 +10,7 @@ const MODELES_PRETS = [
     id: "corde-pincee", titre: "Corde pincée",
     desc: "Corde intégrée de 60 masses. Glisse la bille jaune à travers la corde pour la pincer ; règle le point de pincement et d'écoute.",
     script: () => `# Corde pincee (structure integree + proxies)
-@corde_K param 0.3
+@corde_hz param 110
 @corde_Z param 0.0004
 @corde_Zo param 0.00002
 @pince_pos param 0.27
@@ -18,8 +18,11 @@ const MODELES_PRETS = [
 @pince_K param 0.5
 @pince_echelle param 0.1
 
-@corde string 60 1. corde_K corde_Z corde_Zo 0. 0.
-@in1 posInput 0.
+# la raideur est calculee depuis la note voulue (corde_hz) : baisser la note
+# = une corde virtuellement plus longue, sans ajouter de masses
+@corde string 60 1. [pow(3.14159*corde_hz/(44100*sin(3.14159/118)),2)] corde_Z corde_Zo 0. 0.
+# la bille demarre 0.3 au-dessus (hors de portee) : sinon elle tient la corde
+@in1 posInput 0.3
 @pince nlPluck [@corde pince_pos] @in1 pince_K pince_echelle 0.001
 @out1 posOutput [@corde ecoute_pos]
 @out2 posOutput [@corde 0.5]
@@ -53,13 +56,13 @@ const MODELES_PRETS = [
     id: "corde-marteau", titre: "Corde au marteau",
     desc: "Un marteau (oscillateur) au-dessus de la corde, poussé par une entrée de force : Frapper (ou espace) le lance.",
     script: () => `# Corde frappee par un marteau
-@corde_K param 0.25
+@corde_hz param 98
 @corde_Z param 0.0003
 @corde_Zo param 0.00003
 @frappe_pos param 0.15
 @ecoute_pos param 0.7
 
-@corde string 50 1. corde_K corde_Z corde_Zo 0. 0.
+@corde string 50 1. [pow(3.14159*corde_hz/(44100*sin(3.14159/98)),2)] corde_Z corde_Zo 0. 0.
 @marteau osc 3. 0.0005 0.003 0. 0.
 @choc contact [@corde frappe_pos] @marteau 0.2 0.01 -1.5
 @in1 frcInput @marteau
@@ -95,16 +98,16 @@ const MODELES_PRETS = [
     id: "corde-membrane", titre: "Corde + membrane couplées",
     desc: "Une corde pincée transmet sa vibration à une membrane par un ressort, comme un chevalet sur une table d'harmonie.",
     script: () => `# Corde pincee couplee a une membrane (chevalet)
-@corde_K param 0.3
+@corde_hz param 147
 @corde_Z param 0.0004
 @peau_K param 0.1
 @peau_Z param 0.0008
 @couplage_K param 0.02
 @pince_pos param 0.3
 
-@corde string 50 1. corde_K corde_Z 0.00002 0. 0.
+@corde string 50 1. [pow(3.14159*corde_hz/(44100*sin(3.14159/98)),2)] corde_Z 0.00002 0. 0.
 @table cornerMesh 12 9 2. peau_K peau_Z 0.00005 0. 0.
-@in1 posInput 0.
+@in1 posInput 0.3
 @pince nlPluck [@corde pince_pos] @in1 0.5 0.1 0.001
 @chevalet springDamper [@corde 0.9] [@table 0.5 0.5] couplage_K 0.0001
 @out1 posOutput [@table 0.3 0.7]
@@ -167,13 +170,17 @@ const BRIQUES = {
   corde: {
     titre: "Corde", desc: "Corde intégrée mi-gen (extrémités fixes). Raide = plus brillante, chaîne = libre aux deux bouts.",
     champs: { genre: ["type", "string", ["string", "stiffString", "chain"]], n: ["masses", 50, 3, 1000],
-              M: ["masse", 1, 0.01, 100], K: ["raideur K", 0.3, 0.0001, 1], Z: ["amortissement Z", 0.0004, 0, 0.1],
+              hz: ["note en Hz (corde simple)", 110, 10, 2000],
+              M: ["masse", 1, 0.01, 100], K: ["raideur K (raide / chaîne)", 0.3, 0.0001, 1], Z: ["amortissement Z", 0.0004, 0, 0.1],
               Zo: ["frein vers le repos Zo", 0.00002, 0, 0.1], K2: ["raideur de flexion K2 (corde raide)", 0.1, 0, 1] },
     lignes(mdl, v, vue) {
       const nom = nomLibre(mdl, v.genre === "chain" ? "chaine" : "corde"), y = rangeeLibre(vue);
       const L = Math.min(Math.max(v.n * 0.35, 8), 30);
-      const p = [`@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`];
-      let def = `@${nom} ${v.genre} ${v.n | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
+      const accorde = v.genre === "string";
+      const p = [accorde ? `@${nom}_hz param ${v.hz}` : `@${nom}_K param ${v.K}`, `@${nom}_Z param ${v.Z}`, `@${nom}_Zo param ${v.Zo}`];
+      let def = accorde
+        ? `@${nom} string ${v.n | 0} ${v.M} ${raideurPourNote(nom, v.n | 0, v.M)} ${nom}_Z ${nom}_Zo 0. 0.`
+        : `@${nom} ${v.genre} ${v.n | 0} ${v.M} ${nom}_K ${nom}_Z ${nom}_Zo 0. 0.`;
       if (v.genre === "stiffString") { p.push(`@${nom}_K2 param ${v.K2}`); def = `@${nom} stiffString ${v.n | 0} ${v.M} ${nom}_K ${nom}_K2 ${nom}_Z ${nom}_Zo 0. 0.`; }
       return { params: p, corps: [def], geo: [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 4 ${f2(L / 2)} ${f2(y)} 4`] };
     },
@@ -268,7 +275,8 @@ function lignesExcitation(mdl, desc, i, mode) {
   const base = { frapper: "frappe", pincer: "pince", frotter: "archet" }[mode];
   const cible = refAvecParams(mdl, desc, i, base, params);
   const nom = nomLibre(mdl, base);
-  corps.push(`@${entree} posInput 0.`);
+  // pincer : la bille demarre hors de portee (0.3 > echelle 0.1), sinon elle retient la corde
+  corps.push(`@${entree} posInput ${mode === "pincer" ? "0.3" : "0."}`);
   if (mode === "frapper") {
     corps.push(`@${nom} contact ${cible} @${entree} 0.1 0.002 -3`);
     geo.push(`~pos @${entree} ${f2(g[0])} ${f2(g[1])} ${f2(g[2] + 3)}`);

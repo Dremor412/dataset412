@@ -5,6 +5,7 @@
  * ------------------------------------------------------------------ */
 
 const LEGENDE = {
+  note: ["note", "hauteur de la corde en Hz : plus bas = corde virtuellement plus longue (sans ajouter de masses)"],
   M: ["masse", "inertie d'un point : plus lourd = plus grave et plus lent"],
   K: ["raideur", "force de rappel d'un ressort : plus raide = plus aigu (fréquence ≈ √(K/M))"],
   Z: ["amortissement", "frottement interne d'une liaison : plus grand = son plus court et plus mat"],
@@ -24,7 +25,7 @@ const LEGENDE = {
   nbX: ["masses en x", "taille de la membrane"], nbY: ["masses en y", "taille de la membrane"],
   position: ["position", "point visé sur une corde ou une membrane : 0 = un bout, 1 = l'autre"],
 };
-const ORDRE_LEGENDE = ["M", "K", "Z", "Zo", "K2", "Knl", "Pscale", "Znl", "Vscale", "thresh", "position", "nbMass"];
+const ORDRE_LEGENDE = ["note", "M", "K", "Z", "Zo", "K2", "Knl", "Pscale", "Znl", "Vscale", "thresh", "position", "nbMass"];
 
 app._construitReglagesBase = app._construitReglages;
 
@@ -37,6 +38,7 @@ Object.assign(app, {
       if (!token) return;
       for (const n of String(token).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
         if (!mdl.params.has(n)) continue;
+        if (/_hz$/.test(n) && role === "K") role = "note";      // corde accordee : la note donne K
         if (!roles.has(n)) roles.set(n, []);
         const r = roles.get(n);
         if (!r.some(x => x.role === role && x.ou === ou)) r.push({ role, ou });
@@ -50,7 +52,8 @@ Object.assign(app, {
     for (const mc of mdl.macros.values()) args(mc.genre, mc.args, "@" + mc.nom);
     for (const it of mdl.interactions) {
       args(it.genre, it.args, `${it.genre} @${it.nom}`);
-      for (const r of [it.m1, it.m2]) if (r.macro !== undefined) { note(r.a, "position", "@" + r.macro); note(r.b, "position", "@" + r.macro); }
+      // une position sur une structure appartient a l'interaction qui l'utilise
+      for (const r of [it.m1, it.m2]) if (r.macro !== undefined) { note(r.a, "position", `${it.genre} @${it.nom}`); note(r.b, "position", `${it.genre} @${it.nom}`); }
     }
     for (const s of [...mdl.sorties, ...mdl.entrees])
       if (s.cible.macro !== undefined) { note(s.cible.a, "position", `@${s.nom}`); note(s.cible.b, "position", `@${s.nom}`); }

@@ -23,6 +23,15 @@ class NoyauSon {
     this.mix = new Float64Array(32);
     this.charge = 0;                               // part du temps reel utilisee
     this.routes = [];                              // [{i, frc, gains[canal]}]
+    this.fluidite = 40;                            // ms : glissement des reglages et de la bille
+    this.coupeBas(30);
+  }
+
+  /* filtre coupe-bas (anti-continu) : sous cette frequence le son est attenue.
+   * Monter a 60-120 Hz evite que les petits haut-parleurs saturent sur les basses. */
+  coupeBas(hz) {
+    this.hpHz = Math.min(Math.max(hz || 20, 5), 400);
+    this.hpR = Math.exp(-2 * Math.PI * this.hpHz / this.sr);
   }
 
   message(d) {
@@ -30,7 +39,9 @@ class NoyauSon {
       case "modele": {
         const ancien = this.sim;
         this.sim = d.desc ? new Simulateur(d.desc) : null;
-        if (!(d.garder && this.sim && this.sim.adopter(ancien))) { this.dc.fill(0); this.env = 0; }
+        if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.fluidite, 2) * this.sr / 1000));
+        const garde = d.garder && this.sim && this.sim.transitionDepuis(ancien, Math.round(this.fluidite * this.sr / 1000));
+        if (!garde) { this.dc.fill(0); this.env = 0; }
         this._routage();
         break;
       }
@@ -45,6 +56,11 @@ class NoyauSon {
       case "entrainer": if (this.sim) this.sim.entrainer(d.i, d.v); break;
       case "reset": if (this.sim) this.sim.reset(); this.dc.fill(0); this.env = 0; break;
       case "gain": this.gain = d.v; this.auto = d.auto !== false; break;
+      case "options":                                // fluidite (ms), coupe-bas (Hz)
+        this.fluidite = d.fluidite;
+        if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.fluidite, 2) * this.sr / 1000));
+        this.coupeBas(d.coupeBas);
+        break;
     }
   }
 
@@ -90,7 +106,7 @@ class NoyauSon {
       // filtre anti-continu par canal, puis volume auto et limiteur doux
       let a = 0;
       for (let c = 0; c < C; c++) {
-        const y = mix[c] - dc[2 * c] + 0.995 * dc[2 * c + 1];
+        const y = mix[c] - dc[2 * c] + this.hpR * dc[2 * c + 1];
         dc[2 * c] = mix[c]; dc[2 * c + 1] = y; mix[c] = y;
         a = Math.max(a, Math.abs(y));
       }
@@ -122,7 +138,7 @@ const son = {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) throw new Error("ce navigateur ne gere pas le son (Web Audio)");
-      this.ctx = new AC({ latencyHint: "interactive" });
+      this.ctx = new AC({ latencyHint: this.latence || "interactive" });
       await this._construitNoeud();
     }
     await this.ctx.resume();
@@ -220,6 +236,17 @@ registerProcessor("mims-son", MimsProcesseur);`;
     this.actif = false;
     this.envoyer({ type: "modele", desc: null });
     if (this.ctx) await this.ctx.suspend();
+  },
+
+  /* change la latence : il faut recreer le contexte audio */
+  async changerLatence(l) {
+    this.latence = l;
+    if (!this.ctx) return false;
+    const etait = this.actif;
+    try { await this.ctx.close(); } catch (e) { /* deja ferme */ }
+    this.ctx = null; this.noeud = null; this.noyau = null; this.actif = false;
+    if (etait) await this.demarrer();
+    return etait;
   },
 
   get frequence() { return this.ctx ? this.ctx.sampleRate : 0; },

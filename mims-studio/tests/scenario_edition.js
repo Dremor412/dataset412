@@ -129,19 +129,19 @@ const verif = (ok, msg) => { console.log(`${ok ? "ok  " : "ECHEC"} ${msg}`); if 
 
   // 7. legende et roles
   await p.click("#onglets button[data-onglet=reglages]");
-  const leg = await ev(() => [$("liste-legende").children.length, [...document.querySelectorAll("#liste-reglages .reglage")].find(r => r.querySelector("label").textContent === "corde_K").querySelector(".role").textContent]);
-  verif(leg[0] > 10 && leg[1] && /raideur|amortissement/.test(leg[1]), `legende (${leg[0] / 2} entrees) et role sous les curseurs : « ${leg[1]} »`);
+  const leg = await ev(() => [$("liste-legende").children.length, [...document.querySelectorAll("#liste-reglages .reglage")].find(r => r.querySelector("label").textContent === "corde_hz").querySelector(".role").textContent]);
+  verif(leg[0] > 10 && leg[1] && /note|raideur|amortissement/.test(leg[1]), `legende (${leg[0] / 2} entrees) et role sous les curseurs : « ${leg[1]} »`);
   await p.screenshot({ path: path.join(CAPT, "reglages.png") });
 
   // 8. stabilite + secours automatique
   await p.waitForTimeout(1800);                     // laisse le temps de memoriser des reglages stables
-  await ev(() => app.changerParam("corde_K", 6));
+  await ev(() => app.changerParam("corde_hz", 3000));
   await p.waitForTimeout(100);
-  verif(await ev(() => $("stabilite").classList.contains("alerte")), `K = 6 : alerte « ${await ev(() => $("stabilite").textContent.slice(0, 60))}… »`);
+  verif(await ev(() => $("stabilite").classList.contains("alerte")), `note 3000 Hz : alerte « ${await ev(() => $("stabilite").textContent.slice(0, 60))}… »`);
   await ev(() => app.frapper());                     // on joue : l'instabilite se declenche
   await p.waitForTimeout(1500);
-  const apresK = await ev(() => [app.modele.params.get("corde_K").valeur, $("statut-texte").textContent]);
-  verif(apresK[0] === 0.3, `explosion -> secours automatique : corde_K revient a ${apresK[0]} (« ${apresK[1].slice(0, 70)}… »)`);
+  const apresK = await ev(() => [app.modele.params.get("corde_hz").valeur, $("statut-texte").textContent]);
+  verif(apresK[0] === 147, `explosion -> secours automatique : corde_hz revient a ${apresK[0]} (« ${apresK[1].slice(0, 70)}… »)`);
 
   // 9. charge CPU : stable quand le son s'eteint (nombres denormaux)
   const cpu = await ev(() => {

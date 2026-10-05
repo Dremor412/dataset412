@@ -31,6 +31,7 @@ const app = {
     this._brancheEdition();
     this._brancheEcoute();
     this._brancheSecours();
+    this._brancheJeu();
     tuto.init();
     $("sld-ampli").value = 10;
     this.charger(MODELES_PRETS[0].script(), "corde-pincee.mdl");
@@ -88,7 +89,11 @@ const app = {
       if (!this.modele) return;
       this.desc = compiler(this.modele, { reglages: this.reglagesAudio });
       this.vue.charger(this.desc, true);
-      if (this.anime) { const s = new Simulateur(this.desc); s.adopter(this.sim); this.sim = s; }
+      if (this.anime) {
+        const s = new Simulateur(this.desc);
+        s.transitionDepuis(this.sim, Math.round(this.options.fluidite * 44.1));
+        s.lissage = this.sim.lissage; this.sim = s;
+      }
       if (son.actif) this._envoieModeleSon(true);
       this._appliqueArchet();
     });
@@ -458,6 +463,7 @@ const app = {
     btn.textContent = "🔊 Son"; btn.classList.add("actif");
     $("lbl-vitesse").classList.add("grise");
     this._envoieVolume();
+    this._envoieOptions();
     if (son.multi) this._modeCanaux();
     this._envoieModeleSon(false);
     this._appliqueArchet();

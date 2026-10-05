@@ -314,6 +314,7 @@ class Simulateur {
     });
     this.entrees = Int32Array.from(desc.entrees.map(e => e.i));
     this.impulsion = null;                   // {reste, duree, amp}
+    this._tr = null; this._compteTr = 0;     // transition de coefficients en cours
     this.reset();
   }
 
@@ -332,6 +333,60 @@ class Simulateur {
     this.u.set(autre.u); this.ur.set(autre.ur); this.f.set(autre.f);
     this.cible.set(autre.cible); this.vitesse.set(autre.vitesse);
     return true;
+  }
+
+  /* Comme adopter(), mais les coefficients (raideurs, masses, positions des
+   * proxies...) glissent de leurs anciennes valeurs aux nouvelles en nEch pas :
+   * bouger un curseur ne fait plus de saut (donc plus de clic). */
+  transitionDepuis(ancien, nEch) {
+    if (!this.adopter(ancien)) return false;
+    if (nEch < 8 || ancien.code.length !== this.code.length) return true;
+    const champs = ["A", "B", "invM", "grav", "args", "dec"];
+    const de = {}, vers = {};
+    for (const c of champs) { de[c] = Float64Array.from(ancien[c]); vers[c] = Float64Array.from(this[c]); this[c].set(de[c]); }
+    // proxies : poids sur l'union des anciens et nouveaux points
+    let proxies = null;
+    const np = this.pDebut.length - 1;
+    if (np > 0 && ancien.pDebut.length - 1 === np) {
+      const fin = { pDebut: this.pDebut, pNoeud: this.pNoeud, pPoids: this.pPoids };
+      const deb = [0], noe = [], pde = [], pve = [];
+      for (let k = 0; k < np; k++) {
+        const poids = new Map();
+        for (let j = ancien.pDebut[k]; j < ancien.pDebut[k + 1]; j++) {
+          const n = ancien.pNoeud[j], w = ancien.pPoids[j];
+          poids.set(n, [(poids.get(n) || [0, 0])[0] + w, 0]);
+        }
+        for (let j = this.pDebut[k]; j < this.pDebut[k + 1]; j++) {
+          const n = this.pNoeud[j], w = this.pPoids[j], q = poids.get(n) || [0, 0];
+          poids.set(n, [q[0], q[1] + w]);
+        }
+        for (const [n, [a, b]] of poids) { noe.push(n); pde.push(a); pve.push(b); }
+        deb.push(noe.length);
+      }
+      this.pDebut = Int32Array.from(deb); this.pNoeud = Int32Array.from(noe);
+      this.pPoids = Float64Array.from(pde);
+      proxies = { de: Float64Array.from(pde), vers: Float64Array.from(pve), fin };
+    }
+    this._tr = { k: 0, n: nEch, champs, de, vers, proxies };
+    return true;
+  }
+
+  _avanceTransition() {
+    const tr = this._tr;
+    tr.k += 8;
+    const t = Math.min(tr.k / tr.n, 1);
+    for (const c of tr.champs) {
+      const a = this[c], de = tr.de[c], vers = tr.vers[c];
+      for (let i = 0; i < a.length; i++) a[i] = de[i] + (vers[i] - de[i]) * t;
+    }
+    if (tr.proxies) {
+      const w = this.pPoids, de = tr.proxies.de, vers = tr.proxies.vers;
+      for (let i = 0; i < w.length; i++) w[i] = de[i] + (vers[i] - de[i]) * t;
+    }
+    if (t >= 1) {
+      if (tr.proxies) Object.assign(this, tr.proxies.fin);
+      this._tr = null;
+    }
   }
 
   /* impulsion de vitesse (bouton Frapper) sur un point ou un proxy */
@@ -394,6 +449,7 @@ class Simulateur {
   }
 
   _unPas() {
+    if (this._tr && (this._compteTr = (this._compteTr + 1) & 7) === 0) this._avanceTransition();
     const { u, ur, f, etat, A, B, invM, grav, cible, lissage, n } = this;
     // 1) masses (et entrees pilotees)
     for (let i = 0; i < n; i++) {
