@@ -56,6 +56,10 @@ class NoyauSon {
       case "entrainer": if (this.sim) this.sim.entrainer(d.i, d.v); break;
       case "reset": if (this.sim) this.sim.reset(); this.dc.fill(0); this.env = 0; break;
       case "gain": this.gain = d.v; this.auto = d.auto !== false; break;
+      case "diag":                                  // etat interne (tests)
+        this.poster({ type: "diag", n: this.sim ? this.sim.n : 0, modaux: this.sim ? (this.sim.desc.modaux || []).length : 0,
+                      pointModal: this.sim ? this.sim.pointModal.size : 0 });
+        break;
       case "options":                                // fluidite (ms), coupe-bas (Hz)
         this.fluidite = d.fluidite;
         if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.fluidite, 2) * this.sr / 1000));

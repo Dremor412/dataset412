@@ -60,6 +60,15 @@ Edge, Firefox ou Safari. Tout tourne en local.
 - **Corde accordée en Hz** : `@corde_hz` donne la note, la raideur en
   découle (expression gen~ exportée telle quelle). Baisser la note revient
   à allonger la corde virtuellement, sans ajouter de masses.
+- **migen-plus** (nouvelle librairie gen~, voir `mi-gen-lib/MIGEN-PLUS.md`) :
+  - corde ou barre avec vraie flexion et modulation de tension ;
+  - plaque ou gong ;
+  - choc de Hunt-Crossley et frottement de Stribeck ;
+  - **objets modaux** : un clic dans l'inspecteur (« @cloche en modal »)
+    remplace des centaines de masses par quelques dizaines de modes, stables
+    à toutes les fréquences et bien plus légers dans Max ;
+  - briques physiques : « Corde réelle » (matériau, longueur, diamètre,
+    tension) et « Barre (xylophone) ».
 - **Légende des paramètres** (M, K, Z, Zo…) et rôle de chaque curseur.
   Une **marge de stabilité** prévient avant l'explosion. **Secours** : retour
   automatique aux derniers réglages stables.
@@ -120,7 +129,8 @@ contact sont recalculés.
     src/
       index.html, style.css
       js/01-modele.js       analyse des scripts (syntaxe MIMS4Max + ~pos/~place)
-      js/10-simulateur.js   moteur mi-gen : compilation, structures intégrées, proxies
+      js/10-simulateur.js   moteur mi-gen : compilation, structures intégrées, proxies, migen-plus
+      js/12-modal.js        objets modaux : calcul des modes (diagonalisation)
       js/20-son.js          son temps réel (AudioWorklet)
       js/25-budget.js       mesure de la machine, charge CPU, tailles maximales
       js/30-formes.js       13 formes 3D paramétriques
@@ -135,6 +145,7 @@ contact sont recalculés.
       js/76-reglages.js     légende, stabilité, secours
       js/77-calques.js      réglages en calques, favoris, états, limites de stabilité
       js/78-jeu.js          options de jeu (fluidité, frappe aléatoire, répétition, anti-craquements)
+      js/79-plus.js         migen-plus dans l'interface (modal, briques physiques, excitations)
       js/80-tuto.js         tutoriel pas à pas
       js/99-demarrage.js    lancement
       vendor/mims4max/      générateur officiel MIMS4Max (mi-gen, GPL v3), non modifié
@@ -142,6 +153,9 @@ contact sont recalculés.
       scenario_ui.js        pilote toute l'interface dans Chromium (Playwright)
       scenario_edition.js   tutoriel, édition 3D, écoute multiple, secours
       scenario_reglages.js  calques, favoris, états, limites, options de jeu
+      scenario_plus.js      migen-plus : briques physiques, objets modaux, export
+      equivalence_gen.js    le code gen~ exporté (exécuté avec les vraies librairies) = le studio
+      genexpr.js            mini traducteur genexpr -> JS pour ces tests
       exemples_officiels.js compare l'export aux sorties de MIMS4Max sur les exemples mi-gen
       fichiers/             objets 3D et ancien format pour les tests
 
@@ -151,6 +165,8 @@ Tests (Node + Playwright) :
     node tests/scenario_ui.js
     node tests/scenario_edition.js
     node tests/scenario_reglages.js
+    node tests/scenario_plus.js
+    node tests/equivalence_gen.js
     node tests/exemples_officiels.js <chemin vers un clone de mi-gen>
 
 ## Version Python (ancienne)

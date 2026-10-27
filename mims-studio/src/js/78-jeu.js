@@ -67,16 +67,17 @@ Object.assign(app, {
       else if (this.sim) this.sim.pousser(force, 30);
       return;
     }
-    const frappable = k => k >= d.nbNoeuds || (k >= 0 && d.etat[k] === MOBILE);
+    const virtuel = new Set(d.virtuel || []), vibrants = new Set(d.vibrants || []);
+    const frappable = k => k >= d.nbNoeuds || (k >= 0 && ((d.etat[k] === MOBILE && !virtuel.has(k)) || vibrants.has(k)));
     let i = cible !== null ? cible : this.vue.selection;
     if (cible === null && o.hasard) {
       const mobiles = [];
-      for (let k = 0; k < d.nbNoeuds; k++) if (d.etat[k] === MOBILE) mobiles.push(k);
+      for (let k = 0; k < d.nbNoeuds; k++) if (frappable(k)) mobiles.push(k);
       if (mobiles.length) i = mobiles[Math.floor(Math.random() * mobiles.length)];
     }
     if (!frappable(i)) {
       i = -1;
-      for (let k = 0; k < d.nbNoeuds; k++) if (d.etat[k] === MOBILE && (i < 0 || d.gz[k] > d.gz[i])) i = k;
+      for (let k = 0; k < d.nbNoeuds; k++) if (frappable(k) && (i < 0 || d.gz[k] > d.gz[i])) i = k;
     }
     if (i < 0) return;
     if (son.actif) son.envoyer({ type: "frapper", i, force });

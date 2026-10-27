@@ -548,7 +548,7 @@ const app = {
 
   majJauge() {
     if (!this.modele) return;
-    const c = comptesModele(this.modele);
+    const c = this.desc ? comptesDesc(this.desc) : comptesModele(this.modele);
     const sr = son.frequence || 48000;
     const estimee = budget.charge(c, sr);
     const mesuree = son.actif && son.mode === "worklet" && this._chargeMesuree ? this._chargeMesuree : null;
@@ -626,7 +626,7 @@ const app = {
     const mdl = parse(texte);
     if (mdl.erreurs.length) throw new Error("corrige d'abord les erreurs du script (onglet Script)");
     const conv = versMIMS4Max(mdl, compiler(mdl, { reglages: this.reglagesAudio }), texte);
-    const gen = genererGen(conv.texte, $("chk-invariant").checked);
+    const gen = genererGen(conv.texteGen, $("chk-invariant").checked, conv.plus);
     return { ...conv, ...gen };
   },
 

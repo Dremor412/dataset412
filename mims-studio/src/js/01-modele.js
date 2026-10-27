@@ -22,9 +22,12 @@
 
 const TYPES_MASSE = ["mass", "osc", "ground"];
 const TYPES_INTERACTION = ["spring", "damper", "springDamper", "contact", "nlContact",
-                           "nlSpring2", "nlSpring3", "nlSpringDamper", "nlBow", "nlPluck"];
-const TYPES_MACRO = ["string", "stiffString", "chain", "mesh", "closedMesh", "cornerMesh"];
-const MACROS_CORDE = ["string", "stiffString", "chain"];
+                           "nlSpring2", "nlSpring3", "nlSpringDamper", "nlBow", "nlPluck",
+                           "contactHC", "friction"];                // + migen-plus
+const TYPES_MACRO = ["string", "stiffString", "chain", "mesh", "closedMesh", "cornerMesh",
+                     "bendString", "plate"];                       // + migen-plus
+const MACROS_CORDE = ["string", "stiffString", "chain", "bendString"];
+const TYPES_PLUS = ["bendString", "plate", "contactHC", "friction"];   // demandent migen-plus
 
 /* Arguments [obligatoires, optionnels] : copie de phyDict.genModDict. */
 const ARGS = {
@@ -47,6 +50,11 @@ const ARGS = {
   mesh: [["nbX", "nbY", "M", "K", "Z"], ["Zo"]],
   closedMesh: [["nbX", "nbY", "M", "K", "Z"], ["Zo"]],
   cornerMesh: [["nbX", "nbY", "M", "K", "Z"], ["Zo"]],
+  // migen-plus
+  bendString: [["nbMass", "M", "K", "K2", "Z"], ["Zo", "tmod", "libre"]],
+  plate: [["nbX", "nbY", "M", "K", "K2", "Z"], ["Zo", "tmod", "bords"]],
+  contactHC: [["K", "alpha", "Z"], ["thresh"]],
+  friction: [["Knl", "mus", "mud", "Vscale", "Znl"], []],
 };
 
 /* Description courte de chaque type, pour l'interface. */
@@ -63,6 +71,8 @@ const AIDE_TYPES = {
   string: "corde integree (extremites fixes)", stiffString: "corde raide integree",
   chain: "chaine integree (libre)", mesh: "membrane integree (bords libres)",
   closedMesh: "membrane integree (bords fixes)", cornerMesh: "membrane integree (coins fixes)",
+  bendString: "corde / barre avec flexion (migen-plus)", plate: "plaque avec epaisseur (migen-plus)",
+  contactHC: "choc de Hunt-Crossley (migen-plus)", friction: "frottement de Stribeck (migen-plus)",
 };
 
 /* ---------------- petites expressions : 0.5, k*2, (a+b)/2 ---------------- */
@@ -151,6 +161,7 @@ function nouveauModele() {
     routage: new Map(),       // ~sortie @outN pan p gain dB canal c muet : nom -> reglages
     favoris: [],              // ~favoris p1 p2 ... : parametres epingles en haut des Reglages
     etats: [],                // ~etat nom p1=v1 p2=v2 ... : reglages memorises
+    modaux: [],               // ~modal groupe nbModes : groupe calcule en modes (migen-plus)
   };
 }
 
@@ -218,6 +229,14 @@ function parse(texte) {
       return;
     }
     if (p[0] === "~favoris") { mdl.favoris = p.slice(1); return; }
+    if (p[0] === "~modal") {
+      const nb = Number(p[2]);
+      if (p.length < 3 || !/^[A-Za-z_]\w*$/.test(p[1]) || !(nb >= 1 && nb <= 400)) {
+        err(num, "~modal : attendu ~modal groupe nbModes (1 a 400), ex. ~modal cloche 40"); return;
+      }
+      mdl.modaux.push({ groupe: p[1], nb: Math.round(nb), ligne: num });
+      return;
+    }
     if (p[0] === "~etat") {
       if (p.length < 2) { err(num, "~etat : attendu ~etat nom param=valeur ..."); return; }
       const valeurs = new Map();
@@ -403,11 +422,13 @@ function comptesModele(mdl) {
     if (MACROS_CORDE.includes(mc.genre)) {
       liaisons += nx - 1;
       if (mc.genre === "stiffString") liaisons += nx;
+      if (mc.genre === "bendString") liaisons += 3 * (nx - 2);      // flexion : ~3 ressorts par point
       if (mc.genre !== "chain") fixes += 2;
     } else {
       liaisons += nx * (ny - 1) + (nx - 1) * ny;
       if (mc.genre === "cornerMesh") fixes += 4;
       if (mc.genre === "closedMesh") fixes += 2 * nx + 2 * ny - 4;
+      if (mc.genre === "plate") liaisons += 5 * (nx - 2) * (ny - 2);
     }
   }
   const refs = [...mdl.interactions.flatMap(i => [i.m1, i.m2]),

@@ -41,6 +41,7 @@ class Vue3D {
     this._apercu = null;                 // trace en cours (corde, membrane, cadre)
     this._relierDepuis = -1;
     this._plancher = new Set();
+    this._vibrants = new Set();
     this._drag = null;
     this._demandeDessin = false;
 
@@ -89,7 +90,8 @@ class Vue3D {
       desc.proxyGeo.forEach((g, k) => this.pos.set(g, 3 * (desc.nbNoeuds + k)));
       this._sorties = new Set(desc.sorties.map(s => s.i));
       this._entreesForce = new Set(desc.entrees.map(e => e.i));
-      this._plancher = new Set(desc.plancher || []);
+      this._plancher = new Set([...(desc.plancher || []), ...(desc.virtuel || [])]);   // non dessines
+      this._vibrants = new Set(desc.vibrants || []);
     }
     // garde la selection si les points existent toujours (memes noms)
     const garde = i => ancien && desc && i < T && ancien.noms[i] === desc.noms[i];
@@ -113,10 +115,23 @@ class Vue3D {
       if (d.gz[i] >= 0 && z < 0) z = 0;              // rien ne s'affiche sous le plan
       this.pos[3 * i + 2] = z;
     }
+    // objets modaux : chaque point = somme des modes ponderee par sa deformee
+    for (const md of d.modaux || []) {
+      for (let r = 0; r < md.membres.length; r++) {
+        const i = md.membres[r];
+        if (i === tenue) continue;
+        let s = 0;
+        for (let k = 0; k < md.nb; k++) s += md.lignes[r * md.nb + k] * u[md.debut + k];
+        let z = d.gz[i] + s * amp;
+        if (d.gz[i] >= 0 && z < 0) z = 0;
+        this.pos[3 * i + 2] = z;
+      }
+    }
     for (let k = 0; k < d.nbProxies; k++) {
       const p = d.proxies[k];
       let z = 0;
-      p.noeuds.forEach((n, j) => { z += this.pos[3 * n + 2] * p.poids[j]; });
+      if (p.modal) z = d.proxyGeo[k][2] + u[d.nbNoeuds + k] * amp;
+      else p.noeuds.forEach((n, j) => { z += this.pos[3 * n + 2] * p.poids[j]; });
       this.pos[3 * (d.nbNoeuds + k) + 2] = z;
     }
     this.redessiner();
@@ -199,6 +214,7 @@ class Vue3D {
 
     // liaisons, regroupees par style (un seul trace par groupe)
     const groupes = new Map();
+    if (d.aretesModales && d.aretesModales.length) groupes.set(-1, d.aretesModales.map(([a, b]) => ({ i1: a, i2: b, nom: null })));
     for (const l of d.liens) {
       const interne = l.nom === null;
       const cle = interne ? -1 : l.code;
@@ -229,7 +245,7 @@ class Vue3D {
       let r, coul, carre = false;
       if (i >= n) { r = 3.2 * s; coul = COULEURS.proxy; }
       else {
-        const e = d.etat[i], dansMacro = d.element[i] !== d.noms[i];
+        const e = this._vibrants.has(i) ? MOBILE : d.etat[i], dansMacro = d.element[i] !== d.noms[i];
         if (e === ENTREE) { r = 6 * s; coul = COULEURS.entree; }
         else if (e === FIXE) { r = (dansMacro ? 2.4 : 3.4) * s; coul = COULEURS.fixe; carre = true; }
         else { r = (dansMacro || petit ? 2.2 : 3.5) * s; coul = dansMacro ? COULEURS.macro : COULEURS.mobile; }

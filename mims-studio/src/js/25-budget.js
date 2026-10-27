@@ -67,3 +67,13 @@ const budget = {
     return Math.max(0, Math.floor((this.part / sr - masses * this.coutMasse) / this.coutLien));
   },
 };
+
+/* comptes d'apres le modele compile (tient compte des objets modaux :
+ * un mode = une masse, un point d'ecoute modal ~ nbModes / 2 liaisons) */
+function comptesDesc(desc) {
+  let masses = 0, liaisons = desc.liens.length, proxies = 0;
+  for (let i = 0; i < desc.nbNoeuds; i++) if (desc.etat[i] === MOBILE) masses++;
+  for (const st of desc.structures || []) liaisons += st.type === 0 ? 4 * st.nx : 7 * st.nx * st.ny;
+  for (const p of desc.proxies) proxies += p.modal ? p.noeuds.length / 2 : 1;
+  return { masses, fixes: 0, liaisons, proxies: Math.round(proxies) };
+}

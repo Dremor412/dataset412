@@ -2635,9 +2635,12 @@ module.exports = {generate}
 
 const TYPES_MASSE = ["mass", "osc", "ground"];
 const TYPES_INTERACTION = ["spring", "damper", "springDamper", "contact", "nlContact",
-                           "nlSpring2", "nlSpring3", "nlSpringDamper", "nlBow", "nlPluck"];
-const TYPES_MACRO = ["string", "stiffString", "chain", "mesh", "closedMesh", "cornerMesh"];
-const MACROS_CORDE = ["string", "stiffString", "chain"];
+                           "nlSpring2", "nlSpring3", "nlSpringDamper", "nlBow", "nlPluck",
+                           "contactHC", "friction"];                // + migen-plus
+const TYPES_MACRO = ["string", "stiffString", "chain", "mesh", "closedMesh", "cornerMesh",
+                     "bendString", "plate"];                       // + migen-plus
+const MACROS_CORDE = ["string", "stiffString", "chain", "bendString"];
+const TYPES_PLUS = ["bendString", "plate", "contactHC", "friction"];   // demandent migen-plus
 
 /* Arguments [obligatoires, optionnels] : copie de phyDict.genModDict. */
 const ARGS = {
@@ -2660,6 +2663,11 @@ const ARGS = {
   mesh: [["nbX", "nbY", "M", "K", "Z"], ["Zo"]],
   closedMesh: [["nbX", "nbY", "M", "K", "Z"], ["Zo"]],
   cornerMesh: [["nbX", "nbY", "M", "K", "Z"], ["Zo"]],
+  // migen-plus
+  bendString: [["nbMass", "M", "K", "K2", "Z"], ["Zo", "tmod", "libre"]],
+  plate: [["nbX", "nbY", "M", "K", "K2", "Z"], ["Zo", "tmod", "bords"]],
+  contactHC: [["K", "alpha", "Z"], ["thresh"]],
+  friction: [["Knl", "mus", "mud", "Vscale", "Znl"], []],
 };
 
 /* Description courte de chaque type, pour l'interface. */
@@ -2676,6 +2684,8 @@ const AIDE_TYPES = {
   string: "corde integree (extremites fixes)", stiffString: "corde raide integree",
   chain: "chaine integree (libre)", mesh: "membrane integree (bords libres)",
   closedMesh: "membrane integree (bords fixes)", cornerMesh: "membrane integree (coins fixes)",
+  bendString: "corde / barre avec flexion (migen-plus)", plate: "plaque avec epaisseur (migen-plus)",
+  contactHC: "choc de Hunt-Crossley (migen-plus)", friction: "frottement de Stribeck (migen-plus)",
 };
 
 /* ---------------- petites expressions : 0.5, k*2, (a+b)/2 ---------------- */
@@ -2764,6 +2774,7 @@ function nouveauModele() {
     routage: new Map(),       // ~sortie @outN pan p gain dB canal c muet : nom -> reglages
     favoris: [],              // ~favoris p1 p2 ... : parametres epingles en haut des Reglages
     etats: [],                // ~etat nom p1=v1 p2=v2 ... : reglages memorises
+    modaux: [],               // ~modal groupe nbModes : groupe calcule en modes (migen-plus)
   };
 }
 
@@ -2831,6 +2842,14 @@ function parse(texte) {
       return;
     }
     if (p[0] === "~favoris") { mdl.favoris = p.slice(1); return; }
+    if (p[0] === "~modal") {
+      const nb = Number(p[2]);
+      if (p.length < 3 || !/^[A-Za-z_]\w*$/.test(p[1]) || !(nb >= 1 && nb <= 400)) {
+        err(num, "~modal : attendu ~modal groupe nbModes (1 a 400), ex. ~modal cloche 40"); return;
+      }
+      mdl.modaux.push({ groupe: p[1], nb: Math.round(nb), ligne: num });
+      return;
+    }
     if (p[0] === "~etat") {
       if (p.length < 2) { err(num, "~etat : attendu ~etat nom param=valeur ..."); return; }
       const valeurs = new Map();
@@ -3016,11 +3035,13 @@ function comptesModele(mdl) {
     if (MACROS_CORDE.includes(mc.genre)) {
       liaisons += nx - 1;
       if (mc.genre === "stiffString") liaisons += nx;
+      if (mc.genre === "bendString") liaisons += 3 * (nx - 2);      // flexion : ~3 ressorts par point
       if (mc.genre !== "chain") fixes += 2;
     } else {
       liaisons += nx * (ny - 1) + (nx - 1) * ny;
       if (mc.genre === "cornerMesh") fixes += 4;
       if (mc.genre === "closedMesh") fixes += 2 * nx + 2 * ny - 4;
+      if (mc.genre === "plate") liaisons += 5 * (nx - 2) * (ny - 2);
     }
   }
   const refs = [...mdl.interactions.flatMap(i => [i.m1, i.m2]),
@@ -3057,7 +3078,8 @@ function statsModele(mdl) {
 const ARGS_K = new Set(["K", "K2", "Knl", "KnlP", "KnlQ", "Klim"]);
 const ARGS_Z = new Set(["Z", "Znl", "Vscale", "Zo"]);
 const CODES_INTER = ["spring", "damper", "springDamper", "contact", "nlContact",
-                     "nlSpringDamper", "nlSpring3", "nlSpring2", "nlPluck", "nlBow"];
+                     "nlSpringDamper", "nlSpring3", "nlSpring2", "nlPluck", "nlBow",
+                     "contactHC", "friction"];                    // 10, 11 : migen-plus
 const NB_ARGS = 5;
 const MOBILE = 0, FIXE = 1, ENTREE = 2;
 
@@ -3121,6 +3143,7 @@ function compiler(mdl, options = {}) {
 
   // ---- structures integrees, depliees
   const liens = [];                 // {code, i1, i2, args[]}
+  const structures = [];            // migen-plus : {type 0 corde a flexion / 1 plaque, debut, nx, ny, K, Kb, Z, tmod}
   const macros = new Map();         // nom -> {debut, nx, ny, corde}
   let rangee = 0;
   for (const mc of mdl.macros.values()) {
@@ -3130,8 +3153,12 @@ function compiler(mdl, options = {}) {
     const off = corde ? 1 : 2;                       // apres nbMass / nbX nbY
     const M = Math.max(a[off], 1e-9), invM = 1 / M;
     const K = a[off + 1] * fk;
-    let K2 = 0, Z, Zo;
-    if (mc.genre === "stiffString") { K2 = a[off + 2] * fk; Z = a[off + 3] * fz; Zo = (a[off + 4] || 0) * fz; }
+    let K2 = 0, Z, Zo, tmod = 0, option = 0;
+    const plus = mc.genre === "bendString" || mc.genre === "plate";
+    if (mc.genre === "stiffString" || plus) {
+      K2 = a[off + 2] * fk; Z = a[off + 3] * fz; Zo = (a[off + 4] || 0) * fz;
+      if (plus) { tmod = (a[off + 5] || 0) * fk; option = Math.round(a[off + 6] || 0); }   // libre / bords
+    }
     else { Z = a[off + 2] * fz; Zo = (a[off + 3] || 0) * fz; }
     const A = 2 - Zo * invM, B = Zo * invM - 1;
     const u0 = val(mc.pos), ur0 = u0 - val(mc.vel) / srPos;
@@ -3153,11 +3180,13 @@ function compiler(mdl, options = {}) {
         let g, fixe = false;
         if (corde) {
           g = [pl[0] + (pl[3] - pl[0]) * ti, pl[1] + (pl[4] - pl[1]) * ti, pl[2] + (pl[5] - pl[2]) * ti];
-          fixe = mc.genre !== "chain" && (i === 0 || i === nx - 1);
+          fixe = mc.genre !== "chain" && !(mc.genre === "bendString" && option === 1) && (i === 0 || i === nx - 1);
         } else {
           g = [pl[0] + (pl[3] - pl[0]) * ti, pl[1] + (pl[4] - pl[1]) * tj, pl[2] + (pl[5] - pl[2]) * ti];
           const bordI = i === 0 || i === nx - 1, bordJ = j === 0 || j === ny - 1;
-          fixe = (mc.genre === "cornerMesh" && bordI && bordJ) || (mc.genre === "closedMesh" && (bordI || bordJ));
+          fixe = (mc.genre === "cornerMesh" && bordI && bordJ) || (mc.genre === "closedMesh" && (bordI || bordJ))
+              || (mc.genre === "plate" && ((option === 1 && (bordI || bordJ))
+                                           || (option === 2 && i === Math.floor(nx / 2) && j === Math.floor(ny / 2))));
         }
         const nom = corde ? `${mc.nom}[${i}]` : `${mc.nom}[${i},${j}]`;
         if (fixe) ajoute(nom, mc.nom, FIXE, 2, -1, invM, 0, u0, u0, g);
@@ -3166,7 +3195,9 @@ function compiler(mdl, options = {}) {
     }
     // liaisons internes (ordre de migen-integrated)
     const id = (i, j) => debut + i * ny + j;
-    if (corde) {
+    if (plus) {                                       // migen-plus : calcul dedie (flexion, tension modulee)
+      structures.push({ type: mc.genre === "plate" ? 1 : 0, debut, nx, ny, K, Kb: K2, Z, tmod });
+    } else if (corde) {
       for (let i = 0; i < nx - 1; i++) liens.push({ code: 2, i1: id(i, 0), i2: id(i + 1, 0), args: [K, Z] });
       if (mc.genre === "stiffString") {                // gabarit elargi (i, i+2)
         for (let i = -1; i <= nx - 1; i++) {
@@ -3182,15 +3213,107 @@ function compiler(mdl, options = {}) {
     }
     macros.set(mc.nom, { debut, nx, ny, corde, genre: mc.genre });
   }
-  const nbNoeuds = N.noms.length;
-
   // ---- geometrie automatique des masses sans position
   placementAutomatique(N, mdl, indice, macros);
 
+  // ---- objets modaux (~modal) : le groupe devient des modes (resonateurs)
+  const modaux = [], ligneModale = new Map(), internes = new Set(), aretesModales = [];
+  for (const dir of mdl.modaux || []) {
+    const mc = macros.get(dir.groupe);
+    const membres = mc ? [...Array(mc.nx * mc.ny).keys()].map(k => mc.debut + k)
+      : [...indice].filter(([nom, i]) => nom.startsWith(dir.groupe + "_") && N.etat[i] !== ENTREE && !/(^|_)sol$/.test(nom))
+                   .map(([, i]) => i);
+    const dans = new Set(membres);
+    const mob = membres.filter(i => N.etat[i] === MOBILE);
+    const n = mob.length;
+    if (!n) continue;
+    const pos = new Map(mob.map((i, k) => [i, k]));
+    const K = new Float64Array(n * n), C = new Float64Array(n * n), m = new Float64Array(n);
+    mob.forEach((i, k) => {
+      const Mi = 1 / N.invM[i], z = (N.B[i] + 1) * Mi;
+      m[k] = Mi; C[k * n + k] += z; K[k * n + k] += (2 - N.A[i]) * Mi - z;
+    });
+    const tampon = (p, q, k, c) => {                      // ressort + amortisseur entre p et q
+      const a = pos.get(p), b = pos.get(q);
+      if (a !== undefined) { K[a * n + a] += k; C[a * n + a] += c; }
+      if (b !== undefined) { K[b * n + b] += k; C[b * n + b] += c; }
+      if (a !== undefined && b !== undefined) { K[a * n + b] -= k; K[b * n + a] -= k; C[a * n + b] -= c; C[b * n + a] -= c; }
+      aretesModales.push([p, q]);
+    };
+    for (let k = liens.length - 1; k >= 0; k--) {        // liaisons des structures integrees
+      const l = liens[k];
+      if (dans.has(l.i1) && dans.has(l.i2) && l.code <= 2) {
+        tampon(l.i1, l.i2, l.code === 1 ? 0 : l.args[0], l.code === 0 ? 0 : l.code === 1 ? l.args[0] : l.args[1]);
+        liens.splice(k, 1);
+      }
+    }
+    for (let s = structures.length - 1; s >= 0; s--) {   // corde a flexion / plaque
+      const st = structures[s];
+      if (!dans.has(st.debut)) continue;
+      const id = (i, j) => st.debut + i * st.ny + j;
+      for (let i = 0; i < st.nx; i++) for (let j = 0; j < st.ny - 1; j++) tampon(id(i, j), id(i, j + 1), st.K, st.Z);
+      for (let i = 0; i < st.nx - 1; i++) for (let j = 0; j < st.ny; j++) tampon(id(i, j), id(i + 1, j), st.K, st.Z);
+      const flexion = pts => {                            // Kb * c c^T, c = coefficients de la courbure
+        for (const [p, cp] of pts) for (const [q, cq] of pts) {
+          const a = pos.get(p), b = pos.get(q);
+          if (a !== undefined && b !== undefined) K[a * n + b] += st.Kb * cp * cq;
+        }
+      };
+      if (st.Kb) {
+        if (st.type === 0) for (let i = 1; i < st.nx - 1; i++) flexion([[id(i - 1, 0), 1], [id(i, 0), -2], [id(i + 1, 0), 1]]);
+        else for (let i = 1; i < st.nx - 1; i++) for (let j = 1; j < st.ny - 1; j++)
+          flexion([[id(i, j), -4], [id(i - 1, j), 1], [id(i + 1, j), 1], [id(i, j - 1), 1], [id(i, j + 1), 1]]);
+      }
+      structures.splice(s, 1);
+    }
+    for (const it of mdl.interactions) {                  // ressorts du script entre masses du groupe
+      if (!["spring", "damper", "springDamper"].includes(it.genre) || it.m1.nom === undefined || it.m2.nom === undefined) continue;
+      const p = indice.get(it.m1.nom), q = indice.get(it.m2.nom);
+      if (!dans.has(p) || !dans.has(q)) continue;
+      const a = it.args.map(val);
+      if (it.genre === "spring") tampon(p, q, a[0] * fk, 0);
+      else if (it.genre === "damper") tampon(p, q, 0, a[0] * fz);
+      else tampon(p, q, a[0] * fk, a[1] * fz);
+      internes.add(it);
+    }
+    const res = analyseModale(K, C, m, n, dir.nb);
+    const reg = nom => P.has(`${dir.groupe}_${nom}`) ? P.get(`${dir.groupe}_${nom}`).valeur : null;
+    const hauteurM = reg("hauteur") ?? 1, t60 = reg("t60") ?? res.t60, brillance = reg("brillance") ?? res.brillance;
+    const coef = coefModes(res.omega, hauteurM, t60, brillance, fz, sr || 44100);
+    const debut = N.noms.length, nb = res.omega.length;
+    for (let k = 0; k < nb; k++) ajoute(`${dir.groupe}~mode${k}`, `${dir.groupe}~modes`, MOBILE, coef.A[k], coef.B[k], 1, 0, 0, 0, null);
+    const lignes = new Float64Array(membres.length * nb);
+    membres.forEach((i, r) => {
+      const k0 = pos.get(i);
+      if (k0 !== undefined) for (let k = 0; k < nb; k++) lignes[r * nb + k] = res.formes[k][k0];
+      ligneModale.set(i, { g: modaux.length, r });
+      if (N.etat[i] === MOBILE) N.etat[i] = FIXE;        // le point n'est plus calcule : il est affiche
+    });
+    modaux.push({ nom: dir.groupe, debut, nb, membres, mobiles: mob, lignes, omega: res.omega,
+                  macro: mc ? (mc.corde ? "1d" : "2d") : null, nx: mc ? mc.nx : 0, ny: mc ? mc.ny : 0,
+                  hauteur: hauteurM, t60, brillance, nbMasses: n });
+  }
+  const nbNoeuds = N.noms.length;
+
   // ---- proxies : un point virtuel par reference [@s a] (comme MIMS4Max)
   const proxies = [];
+  // proxy sur un objet modal : poids = somme des deformees des points vises
+  const proxyModal = (paires, texte) => {
+    const md = modaux[ligneModale.get(paires[0][0]).g];
+    const w = new Array(md.nb).fill(0), geo = [0, 0, 0];
+    for (const [pt, p] of paires) {
+      const r = ligneModale.get(pt).r;
+      for (let k = 0; k < md.nb; k++) w[k] += p * md.lignes[r * md.nb + k];
+      geo[0] += p * N.gx[pt]; geo[1] += p * N.gy[pt]; geo[2] += p * N.gz[pt];
+    }
+    proxies.push({ noeuds: [...Array(md.nb).keys()].map(k => md.debut + k), poids: w, ref: texte, geo, modal: true });
+    return nbNoeuds + proxies.length - 1;
+  };
   const resout = ref => {
-    if (ref.nom !== undefined) return indice.get(ref.nom);
+    if (ref.nom !== undefined) {
+      const i = indice.get(ref.nom);
+      return ligneModale.has(i) ? proxyModal([[i, 1]], refTexte(ref)) : i;
+    }
     const mc = macros.get(ref.macro);
     const noeuds = [], poids = [];
     if (mc.corde) {
@@ -3208,12 +3331,19 @@ function compiler(mdl, options = {}) {
       noeuds.push(k(i1, j1), k(i2, j1), k(i1, j2), k(i2, j2));
       poids.push((1 - ai) * (1 - aj), ai * (1 - aj), (1 - ai) * aj, ai * aj);
     }
+    if (ligneModale.has(noeuds[0])) return proxyModal(noeuds.map((nd, k) => [nd, poids[k]]), refTexte(ref));
     proxies.push({ noeuds, poids, ref: refTexte(ref) });
     return nbNoeuds + proxies.length - 1;
   };
 
   // ---- interactions du script
+  const plancherNom = nom => /(^|_)sol$/.test(nom) && mdl.masses.has(nom) && mdl.masses.get(nom).genre === "ground";
+  const estModal = r => r.nom !== undefined ? ligneModale.has(indice.get(r.nom)) : ligneModale.has((macros.get(r.macro) || {}).debut);
   for (const it of mdl.interactions) {
+    if (internes.has(it)) continue;                       // calcule dans les modes
+    // contacts au sol d'un objet modal : abandonnes (un point par masse coute trop cher)
+    if ((it.m1.nom !== undefined && plancherNom(it.m1.nom) && estModal(it.m2)) ||
+        (it.m2.nom !== undefined && plancherNom(it.m2.nom) && estModal(it.m1))) continue;
     const i1 = resout(it.m1), i2 = resout(it.m2);
     const noms = [...ARGS[it.genre][0], ...ARGS[it.genre][1]];
     const args = it.args.map((t, k) => echelle(noms[k], val(t)));
@@ -3230,7 +3360,7 @@ function compiler(mdl, options = {}) {
   });
 
   // hauteur affichee d'un point (proxy = interpolee)
-  const hauteur = i => i < nbNoeuds ? N.gz[i]
+  const hauteur = i => i < nbNoeuds ? N.gz[i] : proxies[i - nbNoeuds].modal ? proxies[i - nbNoeuds].geo[2]
     : proxies[i - nbNoeuds].noeuds.reduce((s, n, k) => s + N.gz[n] * proxies[i - nbNoeuds].poids[k], 0);
 
   // ancien dialecte : contacts / pincements en hauteurs absolues
@@ -3242,8 +3372,9 @@ function compiler(mdl, options = {}) {
     noms: N.noms, element: N.element,
     etat: N.etat, A: N.A, B: N.B, invM: N.invM, grav: N.grav, u0: N.u0, ur0: N.ur0,
     gx: N.gx, gy: N.gy, gz: N.gz,
-    proxies: proxies.map(p => ({ noeuds: p.noeuds, poids: p.poids, ref: p.ref })),
+    proxies: proxies.map(p => ({ noeuds: p.noeuds, poids: p.poids, ref: p.ref, modal: !!p.modal })),
     proxyGeo: proxies.map((p, k) => {
+      if (p.modal) return p.geo;
       const g = [0, 0, 0];
       p.noeuds.forEach((n, j) => { g[0] += N.gx[n] * p.poids[j]; g[1] += N.gy[n] * p.poids[j]; g[2] += N.gz[n] * p.poids[j]; });
       return g;
@@ -3251,6 +3382,10 @@ function compiler(mdl, options = {}) {
     liens: liens.map((l, k) => ({ code: l.code, i1: l.i1, i2: l.i2, args: l.args, dec: dec[k], nom: l.nom || null })),
     entrees, sorties,
     macros: [...macros].map(([nom, m]) => ({ nom, ...m })),
+    structures,
+    modaux, aretesModales,
+    vibrants: modaux.flatMap(md => md.mobiles),           // points d'objets modaux : dessines comme des masses
+    virtuel: modaux.flatMap(md => [...Array(md.nb).keys()].map(k => md.debut + k)),   // modes : pas dessines
     // plancher : point fixe nomme "sol" ou "..._sol" (contacts au plan z = 0)
     plancher: N.noms.map((nom, i) => i).filter(i => N.etat[i] === FIXE && /(^|_)sol$/.test(N.noms[i])),
     indices: [...indice],
@@ -3354,6 +3489,13 @@ class Simulateur {
       for (let j = 0; j < this.nargs[k]; j++) this.args[k * NB_ARGS + j] = l.args[j];
     });
     this.entrees = Int32Array.from(desc.entrees.map(e => e.i));
+    // points d'objets modaux : une frappe se repartit sur les modes
+    this.pointModal = new Map();
+    for (const md of desc.modaux || []) md.membres.forEach((i, r) => this.pointModal.set(i, { md, r }));
+    // structures migen-plus : parametres a plat (K, Kb, Z, tmod) pour les transitions
+    this.structs = (desc.structures || []).map(st => ({ type: st.type, debut: st.debut, nx: st.nx, ny: st.ny }));
+    this.sP = new Float64Array(this.structs.length * 4);
+    (desc.structures || []).forEach((st, k) => this.sP.set([st.K, st.Kb, st.Z, st.tmod], 4 * k));
     this.impulsion = null;                   // {reste, duree, amp}
     this._tr = null; this._compteTr = 0;     // transition de coefficients en cours
     this.reset();
@@ -3381,8 +3523,8 @@ class Simulateur {
    * bouger un curseur ne fait plus de saut (donc plus de clic). */
   transitionDepuis(ancien, nEch) {
     if (!this.adopter(ancien)) return false;
-    if (nEch < 8 || ancien.code.length !== this.code.length) return true;
-    const champs = ["A", "B", "invM", "grav", "args", "dec"];
+    if (nEch < 8 || ancien.code.length !== this.code.length || ancien.sP.length !== this.sP.length) return true;
+    const champs = ["A", "B", "invM", "grav", "args", "dec", "sP"];
     const de = {}, vers = {};
     for (const c of champs) { de[c] = Float64Array.from(ancien[c]); vers[c] = Float64Array.from(this[c]); this[c].set(de[c]); }
     // proxies : poids sur l'union des anciens et nouveaux points
@@ -3437,6 +3579,9 @@ class Simulateur {
       const k = i - this.n;
       for (let j = this.pDebut[k]; j < this.pDebut[k + 1]; j++)
         if (this.etat[this.pNoeud[j]] === MOBILE) this.ur[this.pNoeud[j]] += force * this.pPoids[j];
+    } else if (this.pointModal.has(i)) {
+      const { md, r } = this.pointModal.get(i);
+      for (let k = 0; k < md.nb; k++) this.ur[md.debut + k] += force * md.lignes[r * md.nb + k];
     } else if (this.etat[i] === MOBILE) this.ur[i] += force;
   }
 
@@ -3530,11 +3675,24 @@ class Simulateur {
         case 7: fv = args[o] * d + args[o + 1] * Math.sign(d) * d * d + args[o + 2] * dv; break;
         case 8: fv = Simulateur._nlPluck(d, dv, args, o, nargs[k]); break;
         case 9: fv = Simulateur._nlBow(dv, args, o, nargs[k]); break;
+        case 10: {                                                         // contactHC
+          const dd = d + (nargs[k] > 3 ? args[o + 3] : 0);
+          if (dd > 0) { const dp = Math.pow(dd, args[o + 1]); fv = dp * (args[o] + args[o + 2] * dv); if (fv < 0) fv = 0; }
+          else fv = 0;
+          break;
+        }
+        case 11: {                                                         // friction (Stribeck)
+          const mu = args[o + 2] + (args[o + 1] - args[o + 2]) * Math.exp(-Math.abs(dv) / Math.max(args[o + 3], 1e-12));
+          fv = args[o] * mu * Math.tanh(dv / Math.max(args[o + 4], 1e-12));
+          break;
+        }
         default: continue;
       }
       f[p] -= fv;
       f[q] += fv;
     }
+    // structures migen-plus (corde a flexion, plaque)
+    for (let s = 0; s < this.structs.length; s++) this._structure(this.structs[s], 4 * s);
     // entrees de force
     const imp = this.impulsion;
     if (imp) {
@@ -3549,6 +3707,44 @@ class Simulateur {
       if (fp === 0) continue;
       for (let j = pDebut[k]; j < pDebut[k + 1]; j++) f[pNoeud[j]] += fp * pPoids[j];
       f[n + k] = 0;
+    }
+  }
+
+  /* corde a flexion / plaque : tension (modulee) + amortissement entre
+   * voisins, puis flexion (energie Kb/2 * somme des courbures^2) ;
+   * meme calcul que compute_bend_string / compute_plate de migen-plus */
+  _structure(st, o) {
+    const { u, ur, f } = this, sP = this.sP;
+    const K = sP[o], Kb = sP[o + 1], Z = sP[o + 2], tmod = sP[o + 3];
+    const d0 = st.debut, nx = st.nx, ny = st.ny;
+    let Keff = K;
+    if (tmod !== 0) {
+      let s = 0;
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny - 1; j++) { const e = u[d0 + i * ny + j + 1] - u[d0 + i * ny + j]; s += e * e; }
+      for (let i = 0; i < nx - 1; i++) for (let j = 0; j < ny; j++) { const e = u[d0 + (i + 1) * ny + j] - u[d0 + i * ny + j]; s += e * e; }
+      Keff = K + tmod * s / (st.type === 0 ? nx - 1 : nx * ny);
+    }
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny - 1; j++) {
+      const p = d0 + i * ny + j, q = p + 1;
+      const fv = Keff * (u[p] - u[q]) + Z * ((u[p] - ur[p]) - (u[q] - ur[q]));
+      f[p] -= fv; f[q] += fv;
+    }
+    for (let i = 0; i < nx - 1; i++) for (let j = 0; j < ny; j++) {
+      const p = d0 + i * ny + j, q = p + ny;
+      const fv = Keff * (u[p] - u[q]) + Z * ((u[p] - ur[p]) - (u[q] - ur[q]));
+      f[p] -= fv; f[q] += fv;
+    }
+    if (Kb === 0) return;
+    if (st.type === 0) {
+      for (let i = 1; i < nx - 1; i++) {
+        const p = d0 + i, c = u[p - 1] - 2 * u[p] + u[p + 1];
+        f[p] += 2 * Kb * c; f[p - 1] -= Kb * c; f[p + 1] -= Kb * c;
+      }
+    } else {
+      for (let i = 1; i < nx - 1; i++) for (let j = 1; j < ny - 1; j++) {
+        const p = d0 + i * ny + j, c = u[p - 1] + u[p + 1] + u[p - ny] + u[p + ny] - 4 * u[p];
+        f[p] += 4 * Kb * c; f[p - 1] -= Kb * c; f[p + 1] -= Kb * c; f[p - ny] -= Kb * c; f[p + ny] -= Kb * c;
+      }
     }
   }
 
@@ -3633,13 +3829,186 @@ function margeStabilite(desc) {
     ajoute(l.i1, k, z, 1, mobile(l.i2));
     ajoute(l.i2, k, z, 1, mobile(l.i1));
   }
+  // structures migen-plus : tension 2K par voisin, flexion 16 Kb (corde) / 64 Kb (plaque)
+  for (const st of desc.structures || []) {
+    for (let i = 0; i < st.nx; i++) for (let j = 0; j < st.ny; j++) {
+      const p = st.debut + i * st.ny + j;
+      if (desc.etat[p] !== MOBILE) continue;
+      const voisins = (i > 0) + (i < st.nx - 1) + (j > 0) + (j < st.ny - 1);
+      K[p] += 2 * st.K * voisins + (st.type === 0 ? 16 : 64) * st.Kb;
+      Z[p] += 2 * st.Z * voisins;
+    }
+  }
   let pire = 0, ou = -1;
+  const virtuel = new Set(desc.virtuel || []);              // modes : stables par construction
   for (let i = 0; i < n; i++) {
-    if (desc.etat[i] !== MOBILE) continue;
+    if (desc.etat[i] !== MOBILE || virtuel.has(i)) continue;
     const r = (K[i] + 2 * Z[i]) * desc.invM[i] / 4;
     if (r > pire) { pire = r; ou = i; }
   }
   return { rapport: pire, noeud: ou };
+}
+
+
+/* ===== 12-modal.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  Objets modaux (synthese modale)                                    *
+ *                                                                     *
+ *  ~modal <groupe> <nbModes> transforme un groupe lineaire (toutes    *
+ *  les masses <groupe>_..., ou une structure integree <groupe>) en    *
+ *  modes : chaque mode est un resonateur (frequence + extinction),    *
+ *  un point de frappe ou d'ecoute est la somme des modes ponderee par *
+ *  leur deformee. Equivalent exact du reseau masses-ressorts tant     *
+ *  qu'on garde tous les modes ; stable a toutes les frequences ; et   *
+ *  bien plus leger : quelques dizaines de modes au lieu de centaines  *
+ *  de masses et de ressorts. Dans Max : compute_modal (migen-plus).   *
+ * ------------------------------------------------------------------ */
+
+/* valeurs et vecteurs propres d'une matrice symetrique n x n (a plat,
+ * ligne par ligne) : Householder + QL implicite (tred2 / tqli).
+ * Vecteur propre j = colonne j de z : z[k * n + j]. */
+function vecteursPropres(a, n) {
+  const z = Float64Array.from(a), d = new Float64Array(n), e = new Float64Array(n);
+  for (let i = n - 1; i > 0; i--) {
+    const l = i - 1;
+    let h = 0, scale = 0;
+    if (l > 0) {
+      for (let k = 0; k <= l; k++) scale += Math.abs(z[i * n + k]);
+      if (scale === 0) e[i] = z[i * n + l];
+      else {
+        for (let k = 0; k <= l; k++) { z[i * n + k] /= scale; h += z[i * n + k] * z[i * n + k]; }
+        let f = z[i * n + l];
+        let g = f >= 0 ? -Math.sqrt(h) : Math.sqrt(h);
+        e[i] = scale * g; h -= f * g; z[i * n + l] = f - g; f = 0;
+        for (let j = 0; j <= l; j++) {
+          z[j * n + i] = z[i * n + j] / h;
+          g = 0;
+          for (let k = 0; k <= j; k++) g += z[j * n + k] * z[i * n + k];
+          for (let k = j + 1; k <= l; k++) g += z[k * n + j] * z[i * n + k];
+          e[j] = g / h; f += e[j] * z[i * n + j];
+        }
+        const hh = f / (h + h);
+        for (let j = 0; j <= l; j++) {
+          f = z[i * n + j]; e[j] = g = e[j] - hh * f;
+          for (let k = 0; k <= j; k++) z[j * n + k] -= (f * e[k] + g * z[i * n + k]);
+        }
+      }
+    } else e[i] = z[i * n + l];
+    d[i] = h;
+  }
+  d[0] = 0; e[0] = 0;
+  for (let i = 0; i < n; i++) {
+    const l = i - 1;
+    if (d[i]) {
+      for (let j = 0; j <= l; j++) {
+        let g = 0;
+        for (let k = 0; k <= l; k++) g += z[i * n + k] * z[k * n + j];
+        for (let k = 0; k <= l; k++) z[k * n + j] -= g * z[k * n + i];
+      }
+    }
+    d[i] = z[i * n + i]; z[i * n + i] = 1;
+    for (let j = 0; j <= l; j++) z[j * n + i] = z[i * n + j] = 0;
+  }
+  for (let i = 1; i < n; i++) e[i - 1] = e[i];
+  e[n - 1] = 0;
+  for (let l = 0; l < n; l++) {
+    let iter = 0, m;
+    do {
+      for (m = l; m < n - 1; m++) {
+        const dd = Math.abs(d[m]) + Math.abs(d[m + 1]);
+        if (Math.abs(e[m]) <= Number.EPSILON * dd) break;
+      }
+      if (m !== l) {
+        if (iter++ === 80) throw new Error("calcul des modes : pas de convergence");
+        let g = (d[l + 1] - d[l]) / (2 * e[l]);
+        let r = Math.hypot(g, 1);
+        g = d[m] - d[l] + e[l] / (g + (g >= 0 ? r : -r));
+        let s = 1, c = 1, p = 0, i, sortie = false;
+        for (i = m - 1; i >= l; i--) {
+          let f = s * e[i];
+          const b = c * e[i];
+          e[i + 1] = (r = Math.hypot(f, g));
+          if (r === 0) { d[i + 1] -= p; e[m] = 0; sortie = true; break; }
+          s = f / r; c = g / r; g = d[i + 1] - p; r = (d[i] - g) * s + 2 * c * b;
+          d[i + 1] = g + (p = s * r); g = c * r - b;
+          for (let k = 0; k < n; k++) {
+            f = z[k * n + i + 1];
+            z[k * n + i + 1] = s * z[k * n + i] + c * f;
+            z[k * n + i] = c * z[k * n + i] - s * f;
+          }
+        }
+        if (sortie) continue;
+        d[l] -= p; e[l] = g; e[m] = 0;
+      }
+    } while (m !== l);
+  }
+  return { d, z };
+}
+
+const CACHE_MODES = new Map();
+
+/* modes d'un groupe : K (raideurs), C (amortissements), m (masses) sur les
+ * points mobiles. Renvoie les nb modes les plus graves : pulsation omega
+ * (rad / echantillon a 44,1 kHz), extinction sigma, deformees (normalisees
+ * en masse) aux points du groupe. */
+function analyseModale(K, C, m, n, nb) {
+  // cle de cache : petit hachage des matrices
+  let h = 2166136261 >>> 0;
+  const melange = v => { const s = String(Math.round(v * 1e12)); for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; };
+  for (let i = 0; i < n * n; i++) if (K[i] !== 0 || C[i] !== 0) { melange(i); melange(K[i]); melange(C[i]); }
+  for (let i = 0; i < n; i++) melange(m[i]);
+  const cle = `${n}:${nb}:${h}`;
+  if (CACHE_MODES.has(cle)) return CACHE_MODES.get(cle);
+
+  const r = Float64Array.from(m, v => 1 / Math.sqrt(v));      // M^-1/2
+  const S = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) S[i * n + j] = r[i] * K[i * n + j] * r[j];
+  const { d, z } = vecteursPropres(S, n);
+  const ordre = [...d.keys()].sort((a, b) => d[a] - d[b]).filter(j => d[j] > 1e-12);
+  const omega = [], sigma = [], formes = [];
+  for (const j of ordre) {
+    const sl = Math.sqrt(d[j]);
+    const w = sl < 2 ? 2 * Math.asin(sl / 2) : sl;            // = reseau masses-ressorts tant qu'il est stable
+    if (w >= 3.1) break;
+    const phi = new Float64Array(n);
+    for (let k = 0; k < n; k++) phi[k] = r[k] * z[k * n + j];
+    let s = 0;
+    for (let a = 0; a < n; a++) { if (phi[a] === 0) continue; for (let b = 0; b < n; b++) s += phi[a] * C[a * n + b] * phi[b]; }
+    omega.push(w); sigma.push(Math.max(s / 2, 0)); formes.push(phi);
+    if (omega.length >= nb) break;
+  }
+  // reglages par defaut : t60 du mode grave et "brillance" (sigma ~ lineaire en omega)
+  let t60 = 2, brillance = 0;
+  if (omega.length) {
+    const nM = omega.length, mw = omega.reduce((a, b) => a + b, 0) / nM, ms = sigma.reduce((a, b) => a + b, 0) / nM;
+    let num = 0, den = 0;
+    for (let k = 0; k < nM; k++) { num += (omega[k] - mw) * (sigma[k] - ms); den += (omega[k] - mw) ** 2; }
+    const c = den > 0 ? num / den : 0, a = ms - c * mw;
+    const s1 = Math.max(a + c * omega[0], 1e-9);
+    t60 = Math.min(Math.max(6.91 / (s1 * 44100), 0.05), 60);
+    brillance = Math.min(Math.max(c * omega[0] / s1, 0), 4);
+  }
+  const res = { omega, sigma, formes, t60, brillance };
+  if (CACHE_MODES.size > 20) CACHE_MODES.clear();
+  CACHE_MODES.set(cle, res);
+  return res;
+}
+
+/* coefficients d'un mode, exactement comme compute_modal (migen-plus) */
+function coefModes(omega, hauteur, t60, brillance, fz, sr) {
+  const A = [], B = [];
+  const w1 = (omega[0] || 1) * hauteur * fz;
+  for (const o of omega) {
+    const w = o * hauteur * fz;
+    let r = 0;
+    if (w < 3.1) {
+      const sig = 6.91 / (Math.max(t60, 0.001) * sr) * (1 + brillance * (w / Math.max(w1, 1e-9) - 1));
+      r = Math.exp(-sig);
+    }
+    A.push(2 * r * Math.cos(w)); B.push(-r * r);
+  }
+  return { A, B };
 }
 
 
@@ -3702,6 +4071,10 @@ class NoyauSon {
       case "entrainer": if (this.sim) this.sim.entrainer(d.i, d.v); break;
       case "reset": if (this.sim) this.sim.reset(); this.dc.fill(0); this.env = 0; break;
       case "gain": this.gain = d.v; this.auto = d.auto !== false; break;
+      case "diag":                                  // etat interne (tests)
+        this.poster({ type: "diag", n: this.sim ? this.sim.n : 0, modaux: this.sim ? (this.sim.desc.modaux || []).length : 0,
+                      pointModal: this.sim ? this.sim.pointModal.size : 0 });
+        break;
       case "options":                                // fluidite (ms), coupe-bas (Hz)
         this.fluidite = d.fluidite;
         if (this.sim) this.sim.lissage = 1 - Math.exp(-1 / (Math.max(this.fluidite, 2) * this.sr / 1000));
@@ -3969,6 +4342,16 @@ const budget = {
     return Math.max(0, Math.floor((this.part / sr - masses * this.coutMasse) / this.coutLien));
   },
 };
+
+/* comptes d'apres le modele compile (tient compte des objets modaux :
+ * un mode = une masse, un point d'ecoute modal ~ nbModes / 2 liaisons) */
+function comptesDesc(desc) {
+  let masses = 0, liaisons = desc.liens.length, proxies = 0;
+  for (let i = 0; i < desc.nbNoeuds; i++) if (desc.etat[i] === MOBILE) masses++;
+  for (const st of desc.structures || []) liaisons += st.type === 0 ? 4 * st.nx : 7 * st.nx * st.ny;
+  for (const p of desc.proxies) proxies += p.modal ? p.noeuds.length / 2 : 1;
+  return { masses, fixes: 0, liaisons, proxies: Math.round(proxies) };
+}
 
 
 /* ===== 30-formes.js ===== */
@@ -5173,6 +5556,7 @@ class Vue3D {
     this._apercu = null;                 // trace en cours (corde, membrane, cadre)
     this._relierDepuis = -1;
     this._plancher = new Set();
+    this._vibrants = new Set();
     this._drag = null;
     this._demandeDessin = false;
 
@@ -5221,7 +5605,8 @@ class Vue3D {
       desc.proxyGeo.forEach((g, k) => this.pos.set(g, 3 * (desc.nbNoeuds + k)));
       this._sorties = new Set(desc.sorties.map(s => s.i));
       this._entreesForce = new Set(desc.entrees.map(e => e.i));
-      this._plancher = new Set(desc.plancher || []);
+      this._plancher = new Set([...(desc.plancher || []), ...(desc.virtuel || [])]);   // non dessines
+      this._vibrants = new Set(desc.vibrants || []);
     }
     // garde la selection si les points existent toujours (memes noms)
     const garde = i => ancien && desc && i < T && ancien.noms[i] === desc.noms[i];
@@ -5245,10 +5630,23 @@ class Vue3D {
       if (d.gz[i] >= 0 && z < 0) z = 0;              // rien ne s'affiche sous le plan
       this.pos[3 * i + 2] = z;
     }
+    // objets modaux : chaque point = somme des modes ponderee par sa deformee
+    for (const md of d.modaux || []) {
+      for (let r = 0; r < md.membres.length; r++) {
+        const i = md.membres[r];
+        if (i === tenue) continue;
+        let s = 0;
+        for (let k = 0; k < md.nb; k++) s += md.lignes[r * md.nb + k] * u[md.debut + k];
+        let z = d.gz[i] + s * amp;
+        if (d.gz[i] >= 0 && z < 0) z = 0;
+        this.pos[3 * i + 2] = z;
+      }
+    }
     for (let k = 0; k < d.nbProxies; k++) {
       const p = d.proxies[k];
       let z = 0;
-      p.noeuds.forEach((n, j) => { z += this.pos[3 * n + 2] * p.poids[j]; });
+      if (p.modal) z = d.proxyGeo[k][2] + u[d.nbNoeuds + k] * amp;
+      else p.noeuds.forEach((n, j) => { z += this.pos[3 * n + 2] * p.poids[j]; });
       this.pos[3 * (d.nbNoeuds + k) + 2] = z;
     }
     this.redessiner();
@@ -5331,6 +5729,7 @@ class Vue3D {
 
     // liaisons, regroupees par style (un seul trace par groupe)
     const groupes = new Map();
+    if (d.aretesModales && d.aretesModales.length) groupes.set(-1, d.aretesModales.map(([a, b]) => ({ i1: a, i2: b, nom: null })));
     for (const l of d.liens) {
       const interne = l.nom === null;
       const cle = interne ? -1 : l.code;
@@ -5361,7 +5760,7 @@ class Vue3D {
       let r, coul, carre = false;
       if (i >= n) { r = 3.2 * s; coul = COULEURS.proxy; }
       else {
-        const e = d.etat[i], dansMacro = d.element[i] !== d.noms[i];
+        const e = this._vibrants.has(i) ? MOBILE : d.etat[i], dansMacro = d.element[i] !== d.noms[i];
         if (e === ENTREE) { r = 6 * s; coul = COULEURS.entree; }
         else if (e === FIXE) { r = (dansMacro ? 2.4 : 3.4) * s; coul = COULEURS.fixe; carre = true; }
         else { r = (dansMacro || petit ? 2.2 : 3.5) * s; coul = dansMacro ? COULEURS.macro : COULEURS.mobile; }
@@ -6024,28 +6423,150 @@ function versMIMS4Max(mdl, desc, texteSource) {
   for (const p of audio)
     if (!valides) nouvelles.set(p.ligne, `@${p.nom} audioParam @${renom.get("audio:" + p.nom)}`);
 
+  // migen-plus : MIMS4Max ne connait pas ces structures. Pour la generation,
+  // on les deguise en structure officielle de meme forme (corde / membrane),
+  // puis on remplace l'appel dans le code gen~ (postTraiterPlus).
+  const plus = [], deguises = new Map();
+  for (const mc of mdl.macros.values()) {
+    if (mc.genre === "bendString") {
+      plus.push({ nom: mc.nom, genre: mc.genre, args: mc.args });
+      deguises.set(mc.ligne, `@${mc.nom} stiffString ${mc.args.slice(0, 5).join(" ")} ${mc.pos} ${mc.vel}`);
+    } else if (mc.genre === "plate") {
+      plus.push({ nom: mc.nom, genre: mc.genre, args: mc.args });
+      const a = mc.args;
+      deguises.set(mc.ligne, `@${mc.nom} mesh ${[a[0], a[1], a[2], a[3], a[5]].join(" ")} ${mc.pos} ${mc.vel}`);
+    }
+  }
+  // objets modaux (~modal) : le .gendsp calcule les modes (compute_modal) ; le
+  // .mdl MIMS4Max garde la version masses-ressorts complete (toujours valide)
+  const supprimees = new Set(), refsModales = new Map();     // nom de masse -> [@groupe p]
+  for (const md of desc.modaux || []) {
+    // une structure migen-plus passee en modal n'est plus qu'un objet modal
+    for (let k = plus.length - 1; k >= 0; k--) if (plus[k].nom === md.nom && plus[k].genre !== "modal") plus.splice(k, 1);
+    const reg = (nom, def) => mdl.params.has(`${md.nom}_${nom}`) ? `${md.nom}_${nom}` : String(+def.toPrecision(6));
+    const entree = { genre: "modal", nom: md.nom, nb: md.nb, omega: md.omega, forme: md.macro || "points",
+                     nx: md.nx, ny: md.ny, hauteur: reg("hauteur", md.hauteur), t60: reg("t60", md.t60),
+                     brillance: reg("brillance", md.brillance), lignes: [] };
+    if (md.macro) {
+      const mc = mdl.macros.get(md.nom);
+      deguises.set(mc.ligne, md.macro === "1d" ? `@${md.nom} chain ${md.nb} 1. 0. 0. 0. 0.`
+                                               : `@${md.nom} mesh ${md.nx} ${md.ny} 1. 0. 0. 0. 0.`);
+      for (let r = 0; r < md.membres.length; r++) entree.lignes.push(md.lignes.slice(r * md.nb, (r + 1) * md.nb));
+    } else {
+      const membres = new Set(md.membres.map(i => desc.noms[i]));
+      const plancher = n => /(^|_)sol$/.test(n);
+      let premiere = Infinity;
+      for (const nom of membres) { const m = mdl.masses.get(nom); supprimees.add(m.ligne); premiere = Math.min(premiere, m.ligne); }
+      for (const it of mdl.interactions) {
+        const a = it.m1.nom, b = it.m2.nom;
+        const interne = a !== undefined && b !== undefined && membres.has(a) && membres.has(b) && ["spring", "damper", "springDamper"].includes(it.genre);
+        const sol = (a !== undefined && plancher(a) && membres.has(b)) || (b !== undefined && plancher(b) && membres.has(a));
+        if (interne || sol) supprimees.add(it.ligne);
+      }
+      supprimees.delete(premiere);
+      deguises.set(premiere, `@${md.nom} chain ${md.nb} 1. 0. 0. 0. 0.`);
+      // points vises de l'exterieur : une ligne de formes chacun
+      const vises = [];
+      for (const it of mdl.interactions) if (!supprimees.has(it.ligne)) for (const r of [it.m1, it.m2]) if (r.nom !== undefined && membres.has(r.nom)) vises.push(r.nom);
+      for (const s2 of [...mdl.sorties, ...mdl.entrees]) if (s2.cible.nom !== undefined && membres.has(s2.cible.nom)) vises.push(s2.cible.nom);
+      for (const nom of new Set(vises)) {
+        const r = md.membres.indexOf(new Map(desc.indices).get(nom));
+        refsModales.set(nom, `[@${md.nom} ${entree.lignes.length}]`);
+        entree.lignes.push(md.lignes.slice(r * md.nb, (r + 1) * md.nb));
+      }
+    }
+    plus.push(entree);
+  }
+  const utilisePlus = plus.length > 0 || mdl.interactions.some(i => TYPES_PLUS.includes(i.genre));
+  if (utilisePlus) avert.push("ce modèle utilise migen-plus : le .gendsp demande migen-plus.genexpr à côté des librairies mi-gen " +
+                              "(le .mdl MIMS4Max ne peut pas être compilé par MIMS4Max)");
+
   const renomme = l => l.replace(/@([A-Za-z0-9_]+)(?![A-Za-z0-9_])/g,
                                  (t, n) => renom.has(n) ? "@" + renom.get(n) : t);
-  const L = ["# MIMS script exporte par mi-gen Studio pour MIMS4Max / gen~",
-             "# (les lignes ~pos / ~place gardent la geometrie 3D, Max les ignore)"];
-  lignes.forEach((l, k) => {
-    let t = nouvelles.has(k + 1) ? nouvelles.get(k + 1) : l;
-    if (/^\s*@/.test(t)) t = t.split("#", 1)[0].replace(/\s+$/, "");   // MIMS4Max ne lit pas les # en fin de ligne
-    L.push(renomme(t));
-  });
-  if (geoAjoutee.length) L.push("", "# geometrie 3D (mi-gen Studio)", ...geoAjoutee.map(renomme));
-  return { texte: L.join("\n") + "\n", avertissements: avert };
+  const ecrit = avecDeguises => {
+    const L = ["# MIMS script exporte par mi-gen Studio pour MIMS4Max / gen~",
+               "# (les lignes ~pos / ~place gardent la geometrie 3D, Max les ignore)"];
+    lignes.forEach((l, k) => {
+      if (avecDeguises && supprimees.has(k + 1)) return;
+      let t = avecDeguises && deguises.has(k + 1) ? deguises.get(k + 1) : nouvelles.has(k + 1) ? nouvelles.get(k + 1) : l;
+      if (/^\s*@/.test(t)) t = t.split("#", 1)[0].replace(/\s+$/, "");   // MIMS4Max ne lit pas les # en fin de ligne
+      if (avecDeguises && refsModales.size && /^\s*@/.test(t))
+        t = t.replace(/@([A-Za-z0-9_]+)(?![A-Za-z0-9_])/g, (m, n) => refsModales.has(n) ? refsModales.get(n) : m);
+      L.push(renomme(t));
+    });
+    if (geoAjoutee.length) L.push("", "# geometrie 3D (mi-gen Studio)", ...geoAjoutee.map(renomme));
+    return L.join("\n") + "\n";
+  };
+  return { texte: ecrit(false), texteGen: ecrit(true), plus, avertissements: avert };
+}
+
+/* le generateur officiel apprend les interactions de migen-plus (son
+ * dictionnaire est fait pour ca : nom de fonction + noms d'arguments, qui
+ * decident aussi de la mise a l'echelle _Ksr / _Zsr) */
+function etendreMIMS4Max() {
+  const d = MIMS4MAX("phyDict");
+  if (d.genModDict.contactHC) return;
+  d.interaction_modules.push("contactHC", "friction");
+  d.genModDict.contactHC = { func: "compute_contact_hc", nbArgs: 3, argTypes: ["K", "alpha", "Z"], optArgs: ["thresh"] };
+  d.genModDict.friction = { func: "compute_friction", nbArgs: 5, argTypes: ["Knl", "mus", "mud", "Vscale", "Znl"], optArgs: [] };
+}
+
+/* remplace les structures deguisees par leur vrai appel migen-plus */
+function postTraiterPlus(code, plus, utilisePlus) {
+  if (!utilisePlus) return code;
+  code = code.replace(/(require\(\\"migen-lib\\"\);)/, '$1\nrequire(\\"migen-plus\\");');
+  const t = x => String(x === undefined ? 0 : x).replace(/^\[|\]$/g, "");
+  for (const p of plus) {
+    if (p.genre === "modal") { code = postTraiterModal(code, p); continue; }
+    const a = p.args.map(t);
+    let ancien, appel;
+    if (p.genre === "bendString") {
+      ancien = "compute_stiff_string";
+      appel = `compute_bend_string(${p.nom}, ${a[0]}, ${a[1]}, ${a[2]} * _Ksr, ${a[3]} * _Ksr, ${a[4]} * _Zsr, ` +
+              `Zo = ${t(a[5])} * _Zsr, tmod = ${t(a[6])} * _Ksr, libre = ${t(a[7])});`;
+    } else {
+      ancien = "compute_open_mesh";
+      appel = `compute_plate(${p.nom}, ${a[0]}, ${a[1]}, ${a[2]}, ${a[3]} * _Ksr, ${a[4]} * _Ksr, ${a[5]} * _Zsr, ` +
+              `Zo = ${t(a[6])} * _Zsr, tmod = ${t(a[7])} * _Ksr, bords = ${t(a[8])});`;
+    }
+    const re = new RegExp(`${ancien}\\(${p.nom},[^\\n]*`);
+    if (!re.test(code)) throw new Error(`export migen-plus : appel de @${p.nom} introuvable`);
+    code = code.replace(re, appel);
+  }
+  return code;
+}
+
+/* objet modal : Data des modes et des formes, compute_modal, proxies modaux,
+ * pulsations et formes ecrites dans le bloc d'initialisation */
+function postTraiterModal(code, p) {
+  const nom = p.nom, R = Math.max(p.lignes.length, 1);
+  const reData = new RegExp(`Data ${nom}\\(3, \\d+\\);`);
+  if (!reData.test(code)) throw new Error(`export modal : Data de @${nom} introuvable`);
+  code = code.replace(reData, `Data ${nom}(8, ${p.nb});\nData ${nom}_formes(${R}, ${p.nb});`);
+  const reCalc = new RegExp(`compute_(chain|open_mesh)\\(${nom},[^\\n]*`);
+  if (!reCalc.test(code)) throw new Error(`export modal : calcul de @${nom} introuvable`);
+  code = code.replace(reCalc, `compute_modal(${nom}, ${p.nb}, ${p.hauteur} * _Zsr, ${p.t60}, ${p.brillance});`);
+  const suffixe = p.forme === "1d" ? "_modal_corde" : p.forme === "2d" ? "_modal_grille" : "_modal";
+  const ancien = p.forme === "2d" ? "mesh" : "string";
+  code = code.replace(new RegExp(`(set|apply)_proxy_(pos|frc)_${ancien}\\((\\w+), ${nom}, `, "g"),
+                      (m, a, b, x) => `${a}_proxy_${b}${suffixe}(${x}, ${nom}, ${nom}_formes, `);
+  const init = [`// objet modal ${nom} : ${p.nb} modes (pulsations a 44,1 kHz, formes aux points utiles)`];
+  p.omega.forEach((w, k) => init.push(`poke(${nom}, ${w}, 3, ${k});`));
+  p.lignes.forEach((l, r) => l.forEach((v, k) => { if (v !== 0) init.push(`poke(${nom}_formes, ${v}, ${r}, ${k});`); }));
+  return code.replace("model_init = 1;", init.join("\n") + "\nmodel_init = 1;");
 }
 
 /* code gen~ et .gendsp avec le generateur officiel MIMS4Max */
-function genererGen(texteMIMS4Max, invariant = true) {
+function genererGen(texteMIMS4Max, invariant = true, plus = [], utilisePlus = false) {
+  etendreMIMS4Max();
   const analyse = MIMS4MAX("scriptParser"), cb = MIMS4MAX("codeBuilder"), patch = MIMS4MAX("gendspCreator");
   const journal = console.log;
   console.log = () => {};                              // le generateur est bavard
   try {
     analyse.parseMIMSFile(texteMIMS4Max);
     globalThis.mdl.sampleRateInvariant = invariant ? 1 : 0;
-    const [code, nbEntrees, nbSorties] = new cb.GenCodeBuilder(globalThis.mdl).compileToGenExpr();
+    let [code, nbEntrees, nbSorties] = new cb.GenCodeBuilder(globalThis.mdl).compileToGenExpr();
+    code = postTraiterPlus(code, plus, utilisePlus || plus.length > 0 || /compute_contact_hc|compute_friction/.test(code));
     return {
       code: code.replace(/\\"/g, '"'),                 // tel qu'on le colle dans un codebox
       nbEntrees, nbSorties,
@@ -6618,7 +7139,7 @@ const app = {
 
   majJauge() {
     if (!this.modele) return;
-    const c = comptesModele(this.modele);
+    const c = this.desc ? comptesDesc(this.desc) : comptesModele(this.modele);
     const sr = son.frequence || 48000;
     const estimee = budget.charge(c, sr);
     const mesuree = son.actif && son.mode === "worklet" && this._chargeMesuree ? this._chargeMesuree : null;
@@ -6696,7 +7217,7 @@ const app = {
     const mdl = parse(texte);
     if (mdl.erreurs.length) throw new Error("corrige d'abord les erreurs du script (onglet Script)");
     const conv = versMIMS4Max(mdl, compiler(mdl, { reglages: this.reglagesAudio }), texte);
-    const gen = genererGen(conv.texte, $("chk-invariant").checked);
+    const gen = genererGen(conv.texteGen, $("chk-invariant").checked, conv.plus);
     return { ...conv, ...gen };
   },
 
@@ -7717,22 +8238,246 @@ Object.assign(app, {
       else if (this.sim) this.sim.pousser(force, 30);
       return;
     }
-    const frappable = k => k >= d.nbNoeuds || (k >= 0 && d.etat[k] === MOBILE);
+    const virtuel = new Set(d.virtuel || []), vibrants = new Set(d.vibrants || []);
+    const frappable = k => k >= d.nbNoeuds || (k >= 0 && ((d.etat[k] === MOBILE && !virtuel.has(k)) || vibrants.has(k)));
     let i = cible !== null ? cible : this.vue.selection;
     if (cible === null && o.hasard) {
       const mobiles = [];
-      for (let k = 0; k < d.nbNoeuds; k++) if (d.etat[k] === MOBILE) mobiles.push(k);
+      for (let k = 0; k < d.nbNoeuds; k++) if (frappable(k)) mobiles.push(k);
       if (mobiles.length) i = mobiles[Math.floor(Math.random() * mobiles.length)];
     }
     if (!frappable(i)) {
       i = -1;
-      for (let k = 0; k < d.nbNoeuds; k++) if (d.etat[k] === MOBILE && (i < 0 || d.gz[k] > d.gz[i])) i = k;
+      for (let k = 0; k < d.nbNoeuds; k++) if (frappable(k) && (i < 0 || d.gz[k] > d.gz[i])) i = k;
     }
     if (i < 0) return;
     if (son.actif) son.envoyer({ type: "frapper", i, force });
     else if (this.sim) this.sim.frapper(i, force);
   },
 });
+
+
+/* ===== 79-plus.js ===== */
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  migen-plus dans l'interface : objets modaux (bouton dans           *
+ *  l'inspecteur), briques physiques (corde reelle, barre, plaque),    *
+ *  nouvelles excitations (maillet de Hunt-Crossley, frottement de     *
+ *  Stribeck), legende des nouveaux parametres.                        *
+ * ------------------------------------------------------------------ */
+
+const MATERIAUX = {
+  // densite (kg/m3), module d'Young (GPa)
+  "acier": [7850, 200], "nylon": [1150, 3], "boyau": [1300, 5], "bronze": [8800, 110],
+  "laiton": [8500, 100], "aluminium": [2700, 69], "bois (palissandre)": [850, 18], "verre": [2500, 70],
+};
+const SR2 = 1944810000;                                   // 44100^2
+
+Object.assign(LEGENDE, {
+  longueur: ["longueur", "longueur réelle (m) : plus long = plus grave"],
+  diametre: ["diamètre", "diamètre de la corde (mm) : plus épais = plus grave et plus « raide » (harmoniques étirées)"],
+  epaisseur: ["épaisseur", "épaisseur de la barre (mm) : plus épais = plus aigu"],
+  tension: ["tension", "tension de la corde (N) : plus tendu = plus aigu"],
+  densite: ["densité", "masse volumique du matériau (kg/m³)"],
+  young: ["module d'Young", "rigidité du matériau (GPa) : acier 200, bois 10-20, nylon 3"],
+  t60: ["durée", "temps (s) pour que le son du mode grave baisse de 60 dB"],
+  brillance: ["brillance", "0 = tous les modes durent pareil ; 1 = un mode deux fois plus aigu s'éteint deux fois plus vite"],
+  hauteur: ["hauteur", "multiplie toutes les fréquences de l'objet modal (1 = d'origine, 2 = une octave au-dessus)"],
+  tmod: ["modulation de tension", "plus on joue fort, plus la note monte (corde) ou glisse (gong) ; 0 = linéaire"],
+  alpha: ["dureté du choc", "1 = linéaire, 1.5 = bille, 2-3 = feutre : plus on frappe fort, plus c'est brillant"],
+  mus: ["frottement statique", "accroche de l'archet à l'arrêt"],
+  mud: ["frottement dynamique", "frottement en glissement (plus petit que le statique : accroche-glisse)"],
+  aigus: ["amortissement des aigus", "éteint plus vite les harmoniques aiguës"],
+});
+ORDRE_LEGENDE.push("longueur", "diametre", "tension", "epaisseur", "densite", "young", "hauteur", "t60", "brillance", "tmod", "alpha", "mus", "mud");
+Object.assign(PRIORITE_ROLE, { hauteur: 0, longueur: 0, tension: 0, diametre: 1, epaisseur: 1, t60: 1, brillance: 1,
+                               alpha: 1, mus: 1, mud: 2, tmod: 2, aigus: 2, densite: 3, young: 3 });
+for (const r of ["longueur", "diametre", "tension", "epaisseur", "densite", "young"]) ROLES_STABILITE.add(r);
+
+/* role d'un param d'apres son suffixe (params physiques des briques) */
+const ROLE_SUFFIXE = { _L: "longueur", _d: "diametre", _T: "tension", _h: "epaisseur", _rho: "densite", _E: "young",
+                       _t60: "t60", _brillance: "brillance", _hauteur: "hauteur", _tmod: "tmod", _aigus: "aigus" };
+function roleParSuffixe(nom) {
+  for (const [s, r] of Object.entries(ROLE_SUFFIXE)) if (nom.endsWith(s)) return r;
+  return null;
+}
+
+/* ---------------- briques physiques ---------------- */
+
+const f3 = v => +(+v).toPrecision(4);
+
+Object.assign(BRIQUES, {
+  cordeReelle: {
+    titre: "Corde réelle", desc: "Corde avec flexion (migen-plus) réglée par la physique : matériau, longueur, diamètre, tension. " +
+      "La note et la raideur des harmoniques en découlent.",
+    champs: { materiau: ["matériau", "acier", ["acier", "nylon", "boyau", "bronze", "laiton"]],
+              L: ["longueur (m)", 0.65, 0.05, 3], d: ["diamètre (mm)", 0.3, 0.05, 3], T: ["tension (N)", 70, 1, 2000],
+              t60: ["durée du son (s)", 4, 0.1, 60], n: ["masses", 50, 10, 200] },
+    lignes(mdl, v, vue) {
+      const nom = nomLibre(mdl, "corde"), y = rangeeLibre(vue), N = (v.n | 0) - 1;
+      const [rho, E] = MATERIAUX[v.materiau];
+      const mu = rho * Math.PI * (v.d * 1e-3) ** 2 / 4, c = Math.sqrt(v.T / mu);
+      const K = (c * N / (v.L * 44100)) ** 2, Kb = E * 1e9 * (v.d * 1e-3) ** 2 / (16 * rho) * (N / v.L) ** 4 / SR2;
+      const p = [`@${nom}_L param ${v.L}`, `@${nom}_d param ${v.d}`, `@${nom}_T param ${v.T}`, `@${nom}_rho param ${rho}`,
+                 `@${nom}_E param ${E}`, `@${nom}_t60 param ${v.t60}`, `@${nom}_aigus param 0.0002`, `@${nom}_tmod param 0`];
+      const exK = `[pow(sqrt(${nom}_T/(${nom}_rho*0.785398*pow(${nom}_d*0.001,2)))*${N}/(${nom}_L*44100),2)]`;
+      const exKb = `[${nom}_E*1000000000*pow(${nom}_d*0.001,2)/(16*${nom}_rho)*pow(${N}/${nom}_L,4)/${SR2}]`;
+      const exZo = `[13.82/(${nom}_t60*44100)]`;
+      const L = Math.min(Math.max(v.n * 0.35, 8), 30);
+      const geo = [`~place @${nom} ${f2(-L / 2)} ${f2(y)} 4 ${f2(L / 2)} ${f2(y)} 4`];
+      const instable = K + 4 * Kb > 0.9;
+      if (instable) geo.push(`~modal ${nom} 40`);
+      app.statut(`corde réelle : ≈ ${f3(c / (2 * v.L))} Hz` + (instable ? " — trop raide pour des masses : calculée en modal (stable)" : ""));
+      return { params: p, corps: [`@${nom} bendString ${v.n | 0} 1. ${exK} ${exKb} ${nom}_aigus ${exZo} ${nom}_tmod 0 0. 0.`], geo };
+    },
+  },
+  barre: {
+    titre: "Barre (xylophone)", desc: "Barre libre aux deux bouts, avec flexion : partiels inharmoniques de xylophone / glockenspiel. " +
+      "Toujours calculée en modal (stable et légère).",
+    champs: { materiau: ["matériau", "bois (palissandre)", ["bois (palissandre)", "aluminium", "acier", "verre"]],
+              L: ["longueur (m)", 0.3, 0.05, 2], h: ["épaisseur (mm)", 20, 1, 100], t60: ["durée du son (s)", 1.2, 0.05, 30],
+              modes: ["modes", 16, 4, 80] },
+    lignes(mdl, v, vue) {
+      const nom = nomLibre(mdl, "barre"), y = rangeeLibre(vue), n = 40, N = n - 1;
+      const [rho, E] = MATERIAUX[v.materiau];
+      const f1 = 3.5608 / v.L ** 2 * Math.sqrt(E * 1e9 / rho * (v.h * 1e-3) ** 2 / 12);
+      const exKb = `[${nom}_E*1000000000*pow(${nom}_h*0.001,2)/(12*${nom}_rho)*pow(${N}/${nom}_L,4)/${SR2}]`;
+      app.statut(`barre : premier mode ≈ ${f3(f1)} Hz`);
+      return {
+        params: [`@${nom}_L param ${v.L}`, `@${nom}_h param ${v.h}`, `@${nom}_rho param ${rho}`, `@${nom}_E param ${E}`,
+                 `@${nom}_hauteur param 1`, `@${nom}_t60 param ${v.t60}`, `@${nom}_brillance param 1`],
+        corps: [`@${nom} bendString ${n} 1. 0. ${exKb} 0. 0. 0 1 0. 0.`],
+        geo: [`~place @${nom} ${f2(-v.L * 20)} ${f2(y)} 4 ${f2(v.L * 20)} ${f2(y)} 4`, `~modal ${nom} ${v.modes | 0}`],
+      };
+    },
+  },
+  plaque: {
+    titre: "Plaque / gong", desc: "Plaque avec épaisseur (migen-plus). Avec de la modulation de tension, la note glisse en s'éteignant (gong).",
+    champs: { nx: ["masses en x", 16, 5, 60], ny: ["masses en y", 16, 5, 60], bords: ["bords", "centre (gong suspendu)", ["libres", "fixes", "centre (gong suspendu)"]],
+              K: ["tension K", 0.02, 0, 0.5], Kb: ["flexion Kb", 0.02, 0, 0.06], tmod: ["modulation de tension", 3, 0, 50] },
+    lignes(mdl, v, vue) {
+      const nom = nomLibre(mdl, "plaque"), y = rangeeLibre(vue);
+      const bords = ["libres", "fixes", "centre (gong suspendu)"].indexOf(v.bords);
+      const lx = Math.min((v.nx - 1) * 0.6, 24), ly = Math.min((v.ny - 1) * 0.6, 24);
+      return {
+        params: [`@${nom}_K param ${v.K}`, `@${nom}_Kb param ${v.Kb}`, `@${nom}_aigus param 0.0004`, `@${nom}_Zo param 0.00002`, `@${nom}_tmod param ${v.tmod}`],
+        corps: [`@${nom} plate ${v.nx | 0} ${v.ny | 0} 1. ${nom}_K ${nom}_Kb ${nom}_aigus ${nom}_Zo ${nom}_tmod ${bords} 0. 0.`],
+        geo: [`~place @${nom} ${f2(-lx / 2)} ${f2(y - ly)} 4 ${f2(lx / 2)} ${f2(y)} 4`],
+      };
+    },
+  },
+});
+
+/* ---------------- nouvelles excitations ---------------- */
+
+Object.assign(EXCITATIONS, {
+  maillet: { titre: "Maillet (+)", desc: "Bille au-dessus, choc de Hunt-Crossley : doux quand on effleure, brillant quand on frappe fort, sans clic (migen-plus)." },
+  stribeck: { titre: "Frotter (+)", desc: "Archet à frottement de Stribeck : pression + vitesse, accroche-glisse plus naturel (migen-plus)." },
+});
+const _lignesExcitationBase = lignesExcitation;
+lignesExcitation = function (mdl, desc, i, mode) {
+  if (mode !== "maillet" && mode !== "stribeck") return _lignesExcitationBase(mdl, desc, i, mode);
+  const params = [], corps = [], geo = [];
+  const g = i < desc.nbNoeuds ? [desc.gx[i], desc.gy[i], desc.gz[i]] : desc.proxyGeo[i - desc.nbNoeuds];
+  const entree = entreeLibre(mdl, "in");
+  const base = mode === "maillet" ? "maillet" : "frottement";
+  const cible = refAvecParams(mdl, desc, i, base, params);
+  const nom = nomLibre(mdl, base, params.map(l => l.split(/\s+/)[0].slice(1)));
+  corps.push(`@${entree} posInput 0.`);
+  if (mode === "maillet") {
+    params.push(`@${nom}_K param 0.3`, `@${nom}_alpha param 2.5`);
+    corps.push(`@${nom} contactHC ${cible} @${entree} ${nom}_K ${nom}_alpha 0.02 -3`);
+    geo.push(`~pos @${entree} ${f2(g[0])} ${f2(g[1])} ${f2(g[2] + 3)}`);
+  } else {
+    params.push(`@${nom}_pression param 0.02`, `@${nom}_mus param 0.8`, `@${nom}_mud param 0.3`);
+    corps.push(`@${nom} friction ${cible} @${entree} ${nom}_pression ${nom}_mus ${nom}_mud 0.002 0.0005`);
+    geo.push(`~pos @${entree} ${f2(g[0])} ${f2(g[1] + 0.6)} ${f2(g[2])}`);
+  }
+  return { params, corps, geo };
+};
+
+/* ---------------- objets modaux dans l'inspecteur ---------------- */
+
+Object.assign(app, {
+  /* groupe d'un point : structure integree, ou prefixe commun des masses (cloche_m12 -> cloche) */
+  _groupeDe(el) {
+    if (this.modele.macros.has(el)) return el;
+    const m = /^(.*)_m\d+$/.exec(el);
+    if (!m) return null;
+    const n = [...this.modele.masses.keys()].filter(k => k.startsWith(m[1] + "_m")).length;
+    return n >= 3 ? m[1] : null;
+  },
+
+  basculerModal(groupe, nb = 40) {
+    const texte = $("editeur").value;
+    const dir = this.modele.modaux.find(d => d.groupe === groupe);
+    const avant = budget.charge(comptesDesc(this.desc));
+    if (dir) {                                              // retour aux masses
+      const lignes = texte.split("\n");
+      lignes.splice(dir.ligne - 1, 1);
+      this.modifierTexte(lignes.join("\n"));
+      this.statut(`@${groupe} : de nouveau en masses-ressorts · CPU ${Math.round(avant * 100)} % → ${Math.round(budget.charge(comptesDesc(this.desc)) * 100)} %`);
+      return;
+    }
+    // reglages par defaut d'apres l'amortissement du groupe
+    let essai;
+    try { essai = compiler(parse(texte + `\n~modal ${groupe} ${nb}\n`)).modaux.find(m => m.nom === groupe); }
+    catch (e) { this.statut("calcul des modes impossible : " + e.message); return; }
+    if (!essai) { this.statut(`@${groupe} : rien à calculer en modal (aucune masse mobile)`); return; }
+    const params = [];
+    for (const [k, v] of [["hauteur", 1], ["t60", +essai.t60.toPrecision(3)], ["brillance", +essai.brillance.toPrecision(3)]])
+      if (!this.modele.params.has(`${groupe}_${k}`)) params.push(`@${groupe}_${k} param ${v}`);
+    this.ajouterLignes({ params, corps: [], geo: [`~modal ${groupe} ${nb}`] });
+    const apres = budget.charge(comptesDesc(this.desc));
+    this.statut(`@${groupe} en modal : ${essai.nbMasses} masses → ${essai.nb} modes · CPU ${Math.round(avant * 100)} % → ${Math.round(apres * 100)} %` +
+                " · règle hauteur / t60 / brillance dans Réglages");
+  },
+});
+
+const _majInspecteurBase = app.majInspecteur;
+app.majInspecteur = function () {
+  _majInspecteurBase.call(this);
+  const d = this.desc, sel = [...this.vue.multi];
+  if (!d || sel.length !== 1 || sel[0] >= d.nbNoeuds) return;
+  const el = d.element[sel[0]], g = this._groupeDe(el);
+  if (!g) return;
+  const modal = this.modele.modaux.some(m => m.groupe === g);
+  const md = (d.modaux || []).find(m => m.nom === g);
+  if (md) $("insp-sous").textContent += ` · objet modal : ${md.nb} modes`;
+  const b = document.createElement("button");
+  b.className = "btn";
+  b.textContent = modal ? `↩ @${g} en masses` : `〜 @${g} en modal`;
+  b.title = modal ? "revenir au calcul masse par masse"
+                  : "calculer cet objet en modes (migen-plus) : stable a toutes les frequences, bien plus leger, mais lineaire (pas de contact au sol, pas de modulation de tension)";
+  b.addEventListener("click", () => this.basculerModal(g));
+  $("insp-actions").appendChild(b);
+};
+
+/* l'archet entraine aussi les entrees reliees par un frottement de Stribeck */
+const _entreesArchetBase = app._entreesArchet;
+app._entreesArchet = function () {
+  const s = _entreesArchetBase.call(this);
+  if (!this.modele || !this.desc) return s;
+  const idx = new Map(this.desc.indices);
+  for (const it of this.modele.interactions)
+    if (it.genre === "friction")
+      for (const r of [it.m1, it.m2])
+        if (r.nom !== undefined && this.modele.masses.has(r.nom) && this.modele.masses.get(r.nom).genre === "posInput") s.add(idx.get(r.nom));
+  return s;
+};
+
+/* roles des params physiques (suffixes) et des reglages modaux */
+const _rolesParamsBase = app._rolesParams;
+app._rolesParams = function () {
+  const roles = _rolesParamsBase.call(this);
+  for (const [nom] of this.modele.params) {
+    const r = roleParSuffixe(nom);
+    if (!r) continue;
+    const ou = (roles.get(nom) || [{ ou: "@" + nom.replace(/_[^_]+$/, "") }])[0].ou;
+    roles.set(nom, [{ role: r, ou }]);
+  }
+  return roles;
+};
 
 
 /* ===== 80-tuto.js ===== */
@@ -7903,6 +8648,16 @@ const tuto = {
 "use strict";
 /* demarrage (apres tous les modules) */
 app.init();
+
+/* la barre espace sert a frapper : un bouton qu'on vient de cliquer ne doit
+ * pas garder le focus (sinon espace le « reclique », ex. couper le son) */
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("button");
+  if (b && !b.closest("dialog")) b.blur();
+});
+document.addEventListener("keyup", e => {
+  if (e.key === " " && document.activeElement && document.activeElement.tagName === "BUTTON") e.preventDefault();
+});
 
 /* auto-test : ouvrir avec #selftest dans l'URL */
 if (location.hash === "#selftest") {
