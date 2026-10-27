@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Motion Designer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Spatialisation de sons en mouvement : Doppler, distance, effets, sortie audio au choix et liaison MIDI avec un DAW.">
+<style>
+/*@@STYLE@@*/
+</style>
+</head>
+<body>
+
+<header id="barre">
+  <h1>MOTION<br>DESIGNER</h1>
+  <div class="groupe">
+    <button class="carre" id="btn-annuler" title="Annuler (Ctrl/Cmd+Z)" aria-label="Annuler">↶</button>
+    <button class="carre" id="btn-retablir" title="Rétablir (Ctrl/Cmd+Maj+Z)" aria-label="Rétablir">↷</button>
+  </div>
+  <div class="groupe transport">
+    <span id="temps">00:00.000</span>
+    <button class="carre" id="btn-stop" title="Tout arrêter (Échap)" aria-label="Tout arrêter">■</button>
+    <button class="btn vert" id="btn-jouer" title="Faire jouer toutes les sources"><span class="point"></span><span>TOUT JOUER</span></button>
+  </div>
+  <div class="groupe">
+    <button class="btn" id="btn-rec" title="Enregistrer la sortie en WAV (R)"><span class="point rouge"></span><span>ENREGISTRER</span></button>
+    <button class="btn" id="btn-export" title="Télécharger le dernier enregistrement">EXPORTER</button>
+  </div>
+  <div class="groupe droite">
+    <button class="btn accent" id="btn-sortie" title="Choisir la carte son ou le câble virtuel vers le DAW">🔊 SORTIE AUDIO</button>
+    <button class="btn accent" id="btn-midi" title="Notes, CC et Start/Stop avec le DAW"><span class="led" id="midi-led"></span>MIDI / DAW</button>
+    <button class="btn" id="btn-plein" title="Plein écran (F)">PLEIN ÉCRAN</button>
+    <button class="carre" id="btn-aide" title="Aide" aria-label="Aide">?</button>
+  </div>
+</header>
+
+<main id="atelier">
+  <section id="col-gauche" class="colonne">
+    <div class="col-tete">
+      <div class="surtitre">CALQUES</div>
+      <div class="titre">SOURCES SONORES <span id="nb-sources" class="doux">0 / 20</span></div>
+    </div>
+    <div class="col-actions">
+      <button class="btn accent large" id="btn-ajouter">⤒ AJOUTER DES FICHIERS AUDIO</button>
+    </div>
+    <div id="pistes-defile">
+      <div id="zone-depot">
+        <div class="icone-depot">♪</div>
+        <b>Dépose tes fichiers audio ici</b>
+        <p>Glisse jusqu'à vingt fichiers (WAV, MP3, OGG, FLAC, AIFF…), ou ajoute-les à la main.</p>
+        <button class="lien" id="btn-ajouter-2">AJOUTER DES FICHIERS</button>
+      </div>
+      <div id="pistes"></div>
+    </div>
+    <div class="col-pied">
+      <button class="btn" id="btn-sauver">💾 ENREGISTRER LE PRESET</button>
+      <button class="btn" id="btn-charger">⤓ OUVRIR UN PRESET</button>
+      <p class="mention">🔒 L'audio reste sur cet ordinateur · les presets se téléchargent</p>
+    </div>
+  </section>
+
+  <section id="col-centre" class="colonne">
+    <div class="col-tete ligne">
+      <div>
+        <div class="surtitre">CHAMP SPATIAL</div>
+        <div class="titre">DÉPLACE L'AUDITEUR OU LES SOURCES</div>
+      </div>
+      <div class="lectures">
+        <div><small>VITESSE</small><b id="lecture-vitesse">0.00</b></div>
+        <div><small>DOPPLER</small><b id="lecture-doppler">1.00×</b></div>
+        <button class="lien" id="btn-centrer">CENTRER</button>
+      </div>
+    </div>
+    <div id="zone-champ">
+      <div class="repere haut">LOIN</div>
+      <div class="repere bas">PRÈS</div>
+      <div class="repere gauche">GAUCHE</div>
+      <div class="repere droite">DROITE</div>
+      <canvas id="champ"></canvas>
+      <div id="etat-son">Clique n'importe où pour activer le son</div>
+      <p class="aide-champ">Attrape l'auditeur ou une source pour jouer. Ctrl/Cmd + clic pour grouper, clic dans le vide pour vider. Barre espace : jouer / arrêter la source active.</p>
+    </div>
+    <div id="champ-reglages"></div>
+  </section>
+
+  <section id="col-droite" class="colonne">
+    <div class="col-tete ligne">
+      <div>
+        <div class="surtitre">SORTIE</div>
+        <div class="titre">SIGNAL DE SORTIE</div>
+      </div>
+      <button class="lien" id="btn-reset-master">RÉINITIALISER</button>
+    </div>
+    <div class="bloc-sortie">
+      <button class="sortie-choix" id="btn-sortie-2" title="Changer de sortie audio">
+        <span class="icone">🔊</span><span id="sortie-nom">Sortie par défaut</span><span class="chevron">›</span>
+      </button>
+      <div class="graduations"><span>−60</span><span>−36</span><span>−24</span><span>−12</span><span>−6</span><span>0 dB</span></div>
+      <div class="vu"><span>G<br>D</span><canvas id="vumetre" width="520" height="28"></canvas></div>
+      <div id="master-volume"></div>
+    </div>
+    <div class="defile">
+      <div class="section-titre">EFFETS MASTER</div>
+      <div id="master-fx"></div>
+      <div class="section-titre ligne">CONNECTEURS <small>Clic droit sur un réglage pour le connecter</small></div>
+      <div id="connecteurs"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+//@@SCRIPTS@@
+</script>
+</body>
+</html>

@@ -11,3 +11,8 @@ sonore par masses-interactions pour Max/MSP `gen~`
   machine), on les joue en son temps réel, puis on les exporte en `.gendsp`
   pour Max. Ouvre `mims-studio/MIMS_Studio.html` dans un navigateur, rien à
   installer. Détails dans `mims-studio/README.md`.
+- `motion-designer/` : **Motion Designer**, un spatialiseur de sons en
+  mouvement (Doppler, distance, effets, LFO). On y choisit la sortie audio
+  (carte son ou câble virtuel vers un DAW, en stéréo ou en multipiste) et on
+  le pilote en MIDI depuis le DAW. Ouvre `motion-designer/Motion_Designer.html`,
+  rien à installer. Détails dans `motion-designer/README.md`.
