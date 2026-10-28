@@ -1,0 +1,8 @@
+# statistiques de langage GitHub : ne compter que le code du projet
+mims-studio/MIMS_Studio.html linguist-generated=true
+mims-studio/src/vendor/** linguist-vendored=true
+mi-gen-lib/migen-lib.genexpr linguist-vendored=true
+mi-gen-lib/migen-integrated.genexpr linguist-vendored=true
+mi-gen-lib/migen-proxies.genexpr linguist-vendored=true
+*.genexpr linguist-language=JavaScript
+mims-studio/tests/fichiers/** linguist-vendored=true

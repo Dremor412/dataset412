@@ -157,9 +157,11 @@ contact sont recalculés.
       equivalence_gen.js    le code gen~ exporté (exécuté avec les vraies librairies) = le studio
       genexpr.js            mini traducteur genexpr -> JS pour ces tests
       exemples_officiels.js compare l'export aux sorties de MIMS4Max sur les exemples mi-gen
+      captures_readme.js    images de la page d'accueil GitHub (docs/images)
       fichiers/             objets 3D et ancien format pour les tests
 
-Tests (Node + Playwright) :
+Tests (Node + Playwright) : `npm install && npx playwright install chromium`,
+puis `npm test`, ou un par un :
 
     node build.js
     node tests/scenario_ui.js
@@ -168,6 +170,9 @@ Tests (Node + Playwright) :
     node tests/scenario_plus.js
     node tests/equivalence_gen.js
     node tests/exemples_officiels.js <chemin vers un clone de mi-gen>
+    node tests/captures_readme.js
+
+Les mêmes tests tournent sur GitHub à chaque envoi (`.github/workflows/tests.yml`).
 
 ## Version Python (ancienne)
 

@@ -63,4 +63,5 @@ const officiel = texte => {
   }
   console.log(JSON.stringify(bilan), "erreurs page:", erreursPage);
   await b.close();
+  process.exit(bilan.differents || erreursPage.length ? 1 : 0);
 })();

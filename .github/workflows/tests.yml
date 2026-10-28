@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mims-studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Installer Playwright
+        run: npm install && npx playwright install --with-deps chromium
+      - name: MIMS_Studio.html est à jour avec src/
+        run: node build.js && git diff --exit-code MIMS_Studio.html
+      - name: Code gen~ exporté = studio
+        run: node tests/equivalence_gen.js
+      - name: Exemples officiels mi-gen identiques à MIMS4Max
+        run: |
+          git clone --depth 1 https://github.com/mi-creative/mi-gen ../../mi-gen
+          node tests/exemples_officiels.js ../../mi-gen
+      - name: Interface
+        run: |
+          node tests/scenario_ui.js
+          node tests/scenario_edition.js
+          node tests/scenario_reglages.js
+          node tests/scenario_plus.js

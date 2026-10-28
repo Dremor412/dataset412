@@ -1,0 +1,14 @@
+{
+  "name": "mims-studio",
+  "private": true,
+  "description": "mi-gen Studio : construire, jouer et exporter des modèles masses-interactions pour Max/MSP gen~",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node tests/equivalence_gen.js && node tests/scenario_ui.js && node tests/scenario_edition.js && node tests/scenario_reglages.js && node tests/scenario_plus.js",
+    "captures": "node tests/captures_readme.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

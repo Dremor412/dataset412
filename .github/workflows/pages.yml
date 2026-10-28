@@ -1,0 +1,36 @@
+# Publie le studio sur GitHub Pages : https://<compte>.github.io/<depot>/
+# A activer une fois : Settings > Pages > Source : « GitHub Actions ».
+name: pages
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Préparer le site
+        run: |
+          mkdir -p _site
+          cp mims-studio/MIMS_Studio.html _site/index.html
+          cp -r docs/images _site/images
+          cp mi-gen-lib/*.genexpr _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+      - id: deploiement
+        uses: actions/deploy-pages@v4
