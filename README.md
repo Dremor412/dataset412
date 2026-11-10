@@ -39,7 +39,7 @@ moi » à chaque étape.
 
 | | |
 |---|---|
-| **Construire** | Modèles prêts à jouer, 13 formes 3D paramétriques, briques mi-gen (corde, membrane, oscillateur…) et structures intégrées. Les formes sont accrochées par leurs extrémités et posées sur un sol : elles ne passent jamais sous le plan. |
+| **Construire** | Modèles prêts à jouer (dont un **ressort tendu** et son « piou » de réverbe à ressort), 13 formes 3D paramétriques, briques mi-gen (corde, membrane, oscillateur…) et structures intégrées. Les formes sont accrochées par leurs extrémités et posées sur un sol : elles ne passent jamais sous le plan. |
 | **Importer** | Objets `.obj` / `.stl`, simplifiés automatiquement pour **tenir dans le budget CPU de ta machine** (mesuré au démarrage). |
 | **Éditer en 3D** | Touche Tab : poignées X/Y/Z, sélection au cadre, poser masses et points fixes, tracer cordes et membranes, relier, annuler / refaire. |
 | **Jouer** | Son temps réel (AudioWorklet), bille à attraper, archet, maillet, frappe à force aléatoire, répétition en BPM. |
@@ -93,7 +93,7 @@ Chaque modification est vérifiée automatiquement ([workflow tests](.github/wor
 - les **55 exemples officiels** de mi-gen donnent un code `gen~` identique,
   caractère pour caractère, à celui de MIMS4Max ;
 - le code `gen~` exporté, exécuté avec les vraies librairies `.genexpr`,
-  calcule **exactement** comme le studio (écart ≤ 1e-12 sur 11 modèles, dont
+  calcule **exactement** comme le studio (écart ≤ 1e-9 sur 12 modèles, dont
   4 modaux) ;
 - toute l'interface est pilotée dans Chromium (construire, éditer, jouer,
   régler, exporter).

@@ -215,6 +215,14 @@ class Vue3D {
     // liaisons, regroupees par style (un seul trace par groupe)
     const groupes = new Map();
     if (d.aretesModales && d.aretesModales.length) groupes.set(-1, d.aretesModales.map(([a, b]) => ({ i1: a, i2: b, nom: null })));
+    for (const st of d.structures || []) {             // migen-plus (flexion, plaque) : pas de liens, on trace la grille
+      if (!groupes.has(-1)) groupes.set(-1, []);
+      const g = groupes.get(-1), id = (i, j) => st.debut + i * st.ny + j;
+      for (let i = 0; i < st.nx; i++) for (let j = 0; j < st.ny; j++) {
+        if (i + 1 < st.nx) g.push({ i1: id(i, j), i2: id(i + 1, j) });
+        if (j + 1 < st.ny) g.push({ i1: id(i, j), i2: id(i, j + 1) });
+      }
+    }
     for (const l of d.liens) {
       const interne = l.nom === null;
       const cle = interne ? -1 : l.code;

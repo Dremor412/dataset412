@@ -16,6 +16,7 @@
  *    ~pos @m1 x y z                  position d'une masse / entree    *
  *    ~place @s x0 y0 z0 x1 y1 z1     extremites d'une corde, coins    *
  *                                    opposes d'une membrane           *
+ *    ~helice @s spires rayon         corde dessinee en ressort        *
  *  Ancien dialecte du studio (MIMS online) encore accepte :           *
  *    @m osc M K Z [x y z] vel  -> [x y z] = geometrie, pos physique 0 *
  * ------------------------------------------------------------------ */
@@ -170,7 +171,7 @@ function parse(texte) {
   const err = (l, m) => mdl.erreurs.push([l, m]);
   const avert = (l, m) => mdl.avertissements.push([l, m]);
   const lignes = texte.split(/\r\n|\r|\n/);
-  const geo = new Map(), place = new Map();
+  const geo = new Map(), place = new Map(), helice = new Map();
   const noms = new Set();
 
   // passe 1 : parametres (utilisables partout)
@@ -262,6 +263,14 @@ function parse(texte) {
       const v = p.slice(2).map(Number);
       if (v.some(Number.isNaN)) { err(num, "~place : coordonnees non numeriques"); return; }
       place.set(p[1].slice(1), v);
+      return;
+    }
+    if (p[0] === "~helice") {                    // corde dessinee en helice (ressort) : visuel seulement
+      const v = p.slice(2).map(Number);
+      if (p.length !== 4 || !/^@/.test(p[1]) || v.some(Number.isNaN) || v[0] <= 0 || v[1] < 0) {
+        err(num, "~helice : attendu ~helice @corde nbSpires rayon"); return;
+      }
+      helice.set(p[1].slice(1), v);
       return;
     }
     if (p[0].startsWith("~")) return;             // ~begin / ~end (buffers Max)
@@ -371,6 +380,11 @@ function parse(texte) {
   for (const [n, pl] of place) {
     if (mdl.macros.has(n)) mdl.macros.get(n).place = pl;
     else mdl.avertissements.push([0, `~place @${n} : structure inconnue`]);
+  }
+  for (const [n, h] of helice) {
+    const mc = mdl.macros.get(n);
+    if (mc && MACROS_CORDE.includes(mc.genre)) mc.helice = h;
+    else mdl.avertissements.push([0, `~helice @${n} : corde inconnue`]);
   }
   const verifRef = (ref, ligne, quoi) => {
     if (ref.nom !== undefined) {

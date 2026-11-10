@@ -140,6 +140,38 @@ const MODELES_PRETS = [
 ~pos @o3 4 0 4
 `,
   },
+  {
+    id: "ressort", titre: "Ressort tendu",
+    desc: "Long ressort frappé près d'un bout : les aigus courent plus vite que les graves, chaque aller-retour donne un « piou » " +
+          "descendant (ressort, réverbe à ressort, laser). Frapper (ou espace) lance le marteau.",
+    script: () => `# Ressort tendu (migen-plus) : une corde a flexion tres souple.
+# Dans un ressort, les ondes de flexion sont dispersives : les aigus arrivent
+# avant les graves, d'ou le "piou" descendant qui revient a chaque aller-retour.
+#   ressort_L      longueur (m) : plus long = echos plus espaces, piou plus lent
+#   ressort_T      tension : plus tendu = graves plus rapides, son plus "boing"
+#   ressort_t60    duree du son (s)
+#   ressort_aigus  amortissement des aigus
+#   ressort_tmod   frappe forte = la tension monte (le son glisse)
+@ressort_L param 0.3
+@ressort_T param 1
+@ressort_t60 param 2
+@ressort_aigus param 0.0003
+@ressort_tmod param 0
+@frappe_pos param 0.0083
+@ecoute_pos param 0.995
+
+@ressort bendString 300 1. [0.01*ressort_T] [0.03*pow(0.3/ressort_L,2)] ressort_aigus [13.82/(ressort_t60*44100)] ressort_tmod 0 0. 0.
+@marteau osc 1. 0.0005 0.003 0. 0.
+@choc contactHC [@ressort frappe_pos] @marteau 0.3 1.5 0.02 -1.5
+@in1 frcInput @marteau
+@out1 posOutput [@ressort ecoute_pos]
+@out2 posOutput [@ressort 0.5]
+
+~place @ressort -14 0 4 14 0 4
+~helice @ressort 30 1.2
+~pos @marteau -13.77 0 6.7
+`,
+  },
 ];
 
 /* ---------------- briques a ajouter ---------------- */

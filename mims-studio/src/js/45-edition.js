@@ -13,7 +13,8 @@ function geometrieActuelle(mdl, desc) {
   for (const [nom, i] of desc.indices) masses.set(nom, [desc.gx[i], desc.gy[i], desc.gz[i]]);
   for (const mc of desc.macros) {
     const a = mc.debut, b = mc.debut + mc.nx * mc.ny - 1;
-    macros.set(mc.nom, [desc.gx[a], desc.gy[a], desc.gz[a], desc.gx[b], desc.gy[b], desc.gz[b]]);
+    if (mc.place && mc.corde) macros.set(mc.nom, mc.place.slice());          // (helice : bouts hors de l'axe)
+    else macros.set(mc.nom, [desc.gx[a], desc.gy[a], desc.gz[a], desc.gx[b], desc.gy[b], desc.gz[b]]);
   }
   return { masses, macros };
 }

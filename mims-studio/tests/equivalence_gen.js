@@ -5,7 +5,6 @@
  * echantillon, avec le moteur du studio. Usage : node tests/equivalence_gen.js */
 const path = require("path"), fs = require("fs");
 const { chromium } = require("playwright");
-const { traduireCodebox } = require("./genexpr.js");
 
 const LIBS = ["migen-lib", "migen-integrated", "migen-proxies", "migen-plus"]
   .map(n => fs.readFileSync(path.join(__dirname, "..", "..", "mi-gen-lib", n + ".genexpr"), "utf8"));
@@ -13,6 +12,7 @@ const LIBS = ["migen-lib", "migen-integrated", "migen-proxies", "migen-plus"]
 const MODELES = {
   "corde pincee (string + proxies + nlPluck)": "MODELES_PRETS[0].script()",
   "corde frottee (stiffString + nlBow)": "MODELES_PRETS[1].script()",
+  "ressort tendu (flexion + marteau Hunt-Crossley, ~helice)": "MODELES_PRETS.find(m => m.id === 'ressort').script()",
   "membrane (closedMesh + contact)": "MODELES_PRETS[3].script()",
   "corde + membrane (2 proxies)": "MODELES_PRETS[4].script()",
   "corde a flexion + Hunt-Crossley + tension modulee": `\`
@@ -65,46 +65,55 @@ const MODELES = {
 \``,
 };
 
+// le code gen~ tourne dans la page, avec le meme moteur JS que le studio : les
+// fonctions Math (exp, sin, pow...) peuvent differer d'un dernier bit entre Node
+// et Chromium, et un frottement accroche-glisse amplifie ces ecarts
+const GENEXPR = "(function () { var module = { exports: {} };\n" +
+  fs.readFileSync(path.join(__dirname, "genexpr.js"), "utf8") +
+  "\nwindow.GENEXPR = module.exports; })();";
+
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage();
   await p.goto("file://" + path.join(__dirname, "..", "MIMS_Studio.html"));
   await p.waitForTimeout(600);
   await p.evaluate(() => tuto.fermer());
+  await p.addScriptTag({ content: GENEXPR });
   const N = 6000;
   let echecs = 0;
   for (const [titre, expr] of Object.entries(MODELES)) {
-    const r = await p.evaluate(({ expr, N }) => {
+    const r = await p.evaluate(({ expr, N, LIBS }) => {
       const texte = eval(expr);
       const mdl = parse(texte);
       if (mdl.erreurs.length) return { erreur: mdl.erreurs.map(e => e.join(": ")).join(" | ") };
       const desc = compiler(mdl, { sr: 44100 });
       const conv = versMIMS4Max(mdl, desc, texte);
-      const gen = genererGen(conv.texteGen, true, conv.plus);
-      // le studio : entrees de position instantanees (comme update_input_pos), archet a vitesse fixe
+      const code = genererGen(conv.texteGen, true, conv.plus).code;
+      let gen;
+      try { gen = GENEXPR.traduireCodebox(code, LIBS); }
+      catch (e) { return { erreur: `code gen~ non executable (${e.message})` }; }
+      // excitation : entrees de position (instantanees, comme update_input_pos), archet a
+      // vitesse fixe, ou coup de force (demi-sinus) sur les entrees frcInput
       const sim = new Simulateur(desc);
       sim.lissage = 1;
       const entrees = [...mdl.masses.values()].filter(m => m.genre === "posInput").map(m => sim.noms.indexOf(m.nom));
+      if (entrees.length && mdl.entrees.length) return { erreur: "test : entrees de position et de force melangees" };
       const archet = mdl.interactions.some(i => i.genre === "nlBow" || i.genre === "friction");
-      const signal = t => archet ? 0.003 * t : (t < 200 ? 0.3 : Math.max(0.3 - 0.002 * (t - 200), -8));
-      const sorties = [];
+      const signal = mdl.entrees.length ? t => (t < 30 ? -0.3 * Math.PI / 60 * Math.sin(Math.PI * (t + 0.5) / 30) : 0)
+        : archet ? t => 0.003 * t : t => (t < 200 ? 0.3 : Math.max(0.3 - 0.002 * (t - 200), -8));
+      let ecart = 0, ampl = 0;
       for (let t = 0; t < N; t++) {
-        for (const i of entrees) sim.placer(i, signal(t));
+        const x = signal(t);
+        for (const i of entrees) sim.placer(i, x);
+        if (mdl.entrees.length && x !== 0) sim.impulsion = { reste: 1, duree: 1, amp: x };
         sim._unPas();
-        sorties.push(sim.sorties.map((s, k) => sim.sortie(k)));
+        const outs = gen.pas(...gen.entrees.map(() => x));
+        sim.sorties.forEach((s, k) => { const v = sim.sortie(k); ecart = Math.max(ecart, Math.abs(v - outs[k])); ampl = Math.max(ampl, Math.abs(v)); });
       }
-      return { code: gen.code, sorties, archet, nbIn: gen.nbEntrees, avert: conv.avertissements };
-    }, { expr, N });
+      return { ecart, ampl };
+    }, { expr, N, LIBS });
     if (r.erreur) { console.log(`ECHEC ${titre} : ${r.erreur}`); echecs++; continue; }
-    let gen;
-    try { gen = traduireCodebox(r.code, LIBS); }
-    catch (e) { console.log(`ECHEC ${titre} : code gen~ non executable (${e.message})`); echecs++; continue; }
-    const signal = t => r.archet ? 0.003 * t : (t < 200 ? 0.3 : Math.max(0.3 - 0.002 * (t - 200), -8));
-    let ecart = 0, ampl = 0;
-    for (let t = 0; t < N; t++) {
-      const outs = gen.pas(...gen.entrees.map(() => signal(t)));
-      r.sorties[t].forEach((v, k) => { ecart = Math.max(ecart, Math.abs(v - outs[k])); ampl = Math.max(ampl, Math.abs(v)); });
-    }
+    const { ecart, ampl } = r;
     const ok = ampl > 1e-6 && ecart <= 1e-9 * Math.max(1, ampl);
     if (!ok) echecs++;
     console.log(`${ok ? "ok  " : "ECHEC"} ${titre} : ecart max ${ecart.toExponential(1)} (amplitude ${ampl.toExponential(1)})`);

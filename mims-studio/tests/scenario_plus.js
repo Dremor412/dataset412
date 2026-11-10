@@ -98,6 +98,40 @@ const verif = (ok, msg) => { console.log(`${ok ? "ok  " : "ECHEC"} ${msg}`); if 
   verif(/corde_L: longueur/.test(roles) && /corde_T: tension/.test(roles) && /maillet_alpha: alpha — dureté/.test(roles), `rôles : ${roles.slice(0, 160)}…`);
   await p.screenshot({ path: path.join(CAPT, "reglages_plus.png") });
 
+  // 5. ressort tendu : spires, son disperse (les aigus arrivent avant les graves), brique
+  const rs = await ev(() => {
+    app.charger(MODELES_PRETS.find(m => m.id === "ressort").script(), "ressort.mdl");
+    const d = app.desc, mc = d.macros.find(m => m.nom === "ressort");
+    let horsAxe = 0;
+    for (let k = mc.debut; k < mc.debut + mc.nx; k++) horsAxe = Math.max(horsAxe, Math.hypot(d.gy[k], d.gz[k] - 4));
+    const geo = geometrieActuelle(app.modele, d).macros.get("ressort").join(" ");
+    const n = new NoyauSon(44100, () => {});
+    n.message({ type: "modele", desc: compiler(app.modele, { sr: 44100 }) });
+    n.message({ type: "pousser", force: 0.3 });
+    const L = new Float32Array(128), R = new Float32Array(128), x = [];
+    for (let k = 0; k < 120; k++) { n.remplir([L, R]); x.push(...L); }
+    // arrivee d'une bande de frequence : premier instant ou elle atteint la moitie de son maximum
+    const arrivee = f => {
+      const N = 256, mag = [];
+      for (let t = 0; t + N < x.length; t += 32) {
+        let a = 0, b = 0;
+        for (let j = 0; j < N; j++) { const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * j / N), ph = 2 * Math.PI * f * (t + j) / 44100; a += x[t + j] * w * Math.cos(ph); b += x[t + j] * w * Math.sin(ph); }
+        mag.push(Math.hypot(a, b));
+      }
+      const m = Math.max(...mag.slice(0, 120));
+      return mag.findIndex(v => v >= m / 2) * 32 / 44.1;
+    };
+    app.charger("# vide\n\n", "t.mdl");
+    const br = BRIQUES.ressort, v = {};
+    for (const [k, [, def]] of Object.entries(br.champs)) v[k] = def;
+    app.ajouterLignes(br.lignes(app.modele, v, app.vue));
+    return { horsAxe, geo, fini: x.every(isFinite), aigu: arrivee(2000), grave: arrivee(300),
+             brique: app.modele.erreurs.length === 0 && !!app.modele.macros.get("ressort").helice };
+  });
+  verif(rs.horsAxe > 1.1 && rs.geo === "-14 0 4 14 0 4", `ressort dessiné en spires (rayon ${rs.horsAxe.toFixed(2)}), ~place resté sur l'axe`);
+  verif(rs.fini && rs.aigu < rs.grave, `ressort : les aigus arrivent avant les graves (2 kHz à ${rs.aigu.toFixed(1)} ms, 300 Hz à ${rs.grave.toFixed(1)} ms)`);
+  verif(rs.brique, "brique « Ressort » : compile, avec ~helice");
+
   verif(erreurs.length === 0, `aucune erreur JavaScript (${erreurs.join(" | ")})`);
   console.log(echecs ? `${echecs} ECHEC(S)` : "TOUT EST OK");
   await b.close();

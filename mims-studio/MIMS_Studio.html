@@ -2629,6 +2629,7 @@ module.exports = {generate}
  *    ~pos @m1 x y z                  position d'une masse / entree    *
  *    ~place @s x0 y0 z0 x1 y1 z1     extremites d'une corde, coins    *
  *                                    opposes d'une membrane           *
+ *    ~helice @s spires rayon         corde dessinee en ressort        *
  *  Ancien dialecte du studio (MIMS online) encore accepte :           *
  *    @m osc M K Z [x y z] vel  -> [x y z] = geometrie, pos physique 0 *
  * ------------------------------------------------------------------ */
@@ -2783,7 +2784,7 @@ function parse(texte) {
   const err = (l, m) => mdl.erreurs.push([l, m]);
   const avert = (l, m) => mdl.avertissements.push([l, m]);
   const lignes = texte.split(/\r\n|\r|\n/);
-  const geo = new Map(), place = new Map();
+  const geo = new Map(), place = new Map(), helice = new Map();
   const noms = new Set();
 
   // passe 1 : parametres (utilisables partout)
@@ -2875,6 +2876,14 @@ function parse(texte) {
       const v = p.slice(2).map(Number);
       if (v.some(Number.isNaN)) { err(num, "~place : coordonnees non numeriques"); return; }
       place.set(p[1].slice(1), v);
+      return;
+    }
+    if (p[0] === "~helice") {                    // corde dessinee en helice (ressort) : visuel seulement
+      const v = p.slice(2).map(Number);
+      if (p.length !== 4 || !/^@/.test(p[1]) || v.some(Number.isNaN) || v[0] <= 0 || v[1] < 0) {
+        err(num, "~helice : attendu ~helice @corde nbSpires rayon"); return;
+      }
+      helice.set(p[1].slice(1), v);
       return;
     }
     if (p[0].startsWith("~")) return;             // ~begin / ~end (buffers Max)
@@ -2984,6 +2993,11 @@ function parse(texte) {
   for (const [n, pl] of place) {
     if (mdl.macros.has(n)) mdl.macros.get(n).place = pl;
     else mdl.avertissements.push([0, `~place @${n} : structure inconnue`]);
+  }
+  for (const [n, h] of helice) {
+    const mc = mdl.macros.get(n);
+    if (mc && MACROS_CORDE.includes(mc.genre)) mc.helice = h;
+    else mdl.avertissements.push([0, `~helice @${n} : corde inconnue`]);
   }
   const verifRef = (ref, ligne, quoi) => {
     if (ref.nom !== undefined) {
@@ -3173,6 +3187,7 @@ function compiler(mdl, options = {}) {
         pl = [-lx / 2, y, 0, lx / 2, y + ly, 0]; rangee += Math.ceil(ly / 5) + 1;
       }
     }
+    const helice = corde && mc.helice ? repereHelice(pl, mc.helice) : null;
     const debut = N.noms.length;
     for (let i = 0; i < nx; i++) {
       for (let j = 0; j < ny; j++) {
@@ -3180,6 +3195,10 @@ function compiler(mdl, options = {}) {
         let g, fixe = false;
         if (corde) {
           g = [pl[0] + (pl[3] - pl[0]) * ti, pl[1] + (pl[4] - pl[1]) * ti, pl[2] + (pl[5] - pl[2]) * ti];
+          if (helice) {                               // ressort : spires autour de l'axe (visuel seulement)
+            const th = 2 * Math.PI * helice.spires * ti, c = helice.r * Math.cos(th), s = helice.r * Math.sin(th);
+            for (let k = 0; k < 3; k++) g[k] += c * helice.e1[k] + s * helice.e2[k];
+          }
           fixe = mc.genre !== "chain" && !(mc.genre === "bendString" && option === 1) && (i === 0 || i === nx - 1);
         } else {
           g = [pl[0] + (pl[3] - pl[0]) * ti, pl[1] + (pl[4] - pl[1]) * tj, pl[2] + (pl[5] - pl[2]) * ti];
@@ -3211,7 +3230,7 @@ function compiler(mdl, options = {}) {
       for (let i = 0; i < nx - 1; i++)
         for (let j = 0; j < ny; j++) liens.push({ code: 2, i1: id(i, j), i2: id(i + 1, j), args: [K, Z] });
     }
-    macros.set(mc.nom, { debut, nx, ny, corde, genre: mc.genre });
+    macros.set(mc.nom, { debut, nx, ny, corde, genre: mc.genre, place: pl.slice() });
   }
   // ---- geometrie automatique des masses sans position
   placementAutomatique(N, mdl, indice, macros);
@@ -3390,6 +3409,22 @@ function compiler(mdl, options = {}) {
     plancher: N.noms.map((nom, i) => i).filter(i => N.etat[i] === FIXE && /(^|_)sol$/.test(N.noms[i])),
     indices: [...indice],
   };
+}
+
+/* repere d'une helice autour de l'axe pl (x0 y0 z0 x1 y1 z1) : deux vecteurs
+ * unitaires perpendiculaires a l'axe, le second le plus vertical possible */
+function repereHelice(pl, [spires, r]) {
+  const ax = [pl[3] - pl[0], pl[4] - pl[1], pl[5] - pl[2]];
+  const n = Math.hypot(...ax) || 1;
+  const a = ax.map(v => v / n);
+  const vec = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const norme = v => { const l = Math.hypot(...v) || 1; return v.map(x => x / l); };
+  let e1 = vec(a, [0, 0, 1]);
+  if (Math.hypot(...e1) < 1e-6) e1 = [1, 0, 0];         // axe vertical
+  e1 = norme(e1);
+  const e2 = norme(vec(e1, a));
+  if (e2[2] < 0) for (let k = 0; k < 3; k++) { e2[k] = -e2[k]; e1[k] = -e1[k]; }
+  return { spires, r, e1, e2 };
 }
 
 /* Positions 3D pour les masses qui n'en ont pas (scripts MIMS4Max) :
@@ -5321,6 +5356,38 @@ const MODELES_PRETS = [
 ~pos @o3 4 0 4
 `,
   },
+  {
+    id: "ressort", titre: "Ressort tendu",
+    desc: "Long ressort frappé près d'un bout : les aigus courent plus vite que les graves, chaque aller-retour donne un « piou » " +
+          "descendant (ressort, réverbe à ressort, laser). Frapper (ou espace) lance le marteau.",
+    script: () => `# Ressort tendu (migen-plus) : une corde a flexion tres souple.
+# Dans un ressort, les ondes de flexion sont dispersives : les aigus arrivent
+# avant les graves, d'ou le "piou" descendant qui revient a chaque aller-retour.
+#   ressort_L      longueur (m) : plus long = echos plus espaces, piou plus lent
+#   ressort_T      tension : plus tendu = graves plus rapides, son plus "boing"
+#   ressort_t60    duree du son (s)
+#   ressort_aigus  amortissement des aigus
+#   ressort_tmod   frappe forte = la tension monte (le son glisse)
+@ressort_L param 0.3
+@ressort_T param 1
+@ressort_t60 param 2
+@ressort_aigus param 0.0003
+@ressort_tmod param 0
+@frappe_pos param 0.0083
+@ecoute_pos param 0.995
+
+@ressort bendString 300 1. [0.01*ressort_T] [0.03*pow(0.3/ressort_L,2)] ressort_aigus [13.82/(ressort_t60*44100)] ressort_tmod 0 0. 0.
+@marteau osc 1. 0.0005 0.003 0. 0.
+@choc contactHC [@ressort frappe_pos] @marteau 0.3 1.5 0.02 -1.5
+@in1 frcInput @marteau
+@out1 posOutput [@ressort ecoute_pos]
+@out2 posOutput [@ressort 0.5]
+
+~place @ressort -14 0 4 14 0 4
+~helice @ressort 30 1.2
+~pos @marteau -13.77 0 6.7
+`,
+  },
 ];
 
 /* ---------------- briques a ajouter ---------------- */
@@ -5730,6 +5797,14 @@ class Vue3D {
     // liaisons, regroupees par style (un seul trace par groupe)
     const groupes = new Map();
     if (d.aretesModales && d.aretesModales.length) groupes.set(-1, d.aretesModales.map(([a, b]) => ({ i1: a, i2: b, nom: null })));
+    for (const st of d.structures || []) {             // migen-plus (flexion, plaque) : pas de liens, on trace la grille
+      if (!groupes.has(-1)) groupes.set(-1, []);
+      const g = groupes.get(-1), id = (i, j) => st.debut + i * st.ny + j;
+      for (let i = 0; i < st.nx; i++) for (let j = 0; j < st.ny; j++) {
+        if (i + 1 < st.nx) g.push({ i1: id(i, j), i2: id(i + 1, j) });
+        if (j + 1 < st.ny) g.push({ i1: id(i, j), i2: id(i, j + 1) });
+      }
+    }
     for (const l of d.liens) {
       const interne = l.nom === null;
       const cle = interne ? -1 : l.code;
@@ -6171,7 +6246,8 @@ function geometrieActuelle(mdl, desc) {
   for (const [nom, i] of desc.indices) masses.set(nom, [desc.gx[i], desc.gy[i], desc.gz[i]]);
   for (const mc of desc.macros) {
     const a = mc.debut, b = mc.debut + mc.nx * mc.ny - 1;
-    macros.set(mc.nom, [desc.gx[a], desc.gy[a], desc.gz[a], desc.gx[b], desc.gy[b], desc.gz[b]]);
+    if (mc.place && mc.corde) macros.set(mc.nom, mc.place.slice());          // (helice : bouts hors de l'axe)
+    else macros.set(mc.nom, [desc.gx[a], desc.gy[a], desc.gz[a], desc.gx[b], desc.gy[b], desc.gz[b]]);
   }
   return { masses, macros };
 }
@@ -8348,6 +8424,21 @@ Object.assign(BRIQUES, {
                  `@${nom}_hauteur param 1`, `@${nom}_t60 param ${v.t60}`, `@${nom}_brillance param 1`],
         corps: [`@${nom} bendString ${n} 1. 0. ${exKb} 0. 0. 0 1 0. 0.`],
         geo: [`~place @${nom} ${f2(-v.L * 20)} ${f2(y)} 4 ${f2(v.L * 20)} ${f2(y)} 4`, `~modal ${nom} ${v.modes | 0}`],
+      };
+    },
+  },
+  ressort: {
+    titre: "Ressort", desc: "Ressort tendu (corde à flexion très souple, migen-plus) : chaque aller-retour donne un « piou » descendant. " +
+      "Frappe-le près d'un bout et écoute près de l'autre.",
+    champs: { L: ["longueur (m)", 0.3, 0.15, 1.5], T: ["tension", 1, 0, 5], t60: ["durée du son (s)", 2, 0.1, 20],
+              spires: ["spires (dessin)", 30, 5, 80] },
+    lignes(mdl, v, vue) {
+      const nom = nomLibre(mdl, "ressort"), y = rangeeLibre(vue);
+      return {
+        params: [`@${nom}_L param ${v.L}`, `@${nom}_T param ${v.T}`, `@${nom}_t60 param ${v.t60}`,
+                 `@${nom}_aigus param 0.0003`, `@${nom}_tmod param 0`],
+        corps: [`@${nom} bendString 300 1. [0.01*${nom}_T] [0.03*pow(0.3/${nom}_L,2)] ${nom}_aigus [13.82/(${nom}_t60*44100)] ${nom}_tmod 0 0. 0.`],
+        geo: [`~place @${nom} -14 ${f2(y)} 4 14 ${f2(y)} 4`, `~helice @${nom} ${v.spires | 0} 1.2`],
       };
     },
   },

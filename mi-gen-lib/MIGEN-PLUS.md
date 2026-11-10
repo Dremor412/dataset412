@@ -115,7 +115,7 @@ Max :
 autrement : `mims-studio/tests/genexpr.js` traduit le genexpr en JavaScript.
 Avec lui, le code gen~ exporté, exécuté avec les vraies librairies `.genexpr`
 (mi-gen et migen-plus), donne **exactement** la même sortie que le studio
-(écart ≤ 1e-12) sur 11 modèles, dont 4 modaux. Cela prouve la logique, pas la
+(écart ≤ 1e-9) sur 12 modèles, dont 4 modaux. Cela prouve la logique, pas la
 syntaxe exacte de gen~ : signale-moi la moindre erreur de compilation dans Max.
 
 ## Ce que j'ai écarté, et pourquoi

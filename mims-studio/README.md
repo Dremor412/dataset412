@@ -11,7 +11,8 @@ Edge, Firefox ou Safari. Tout tourne en local.
 
 - **Construire**
   - Des modèles prêts à jouer : corde pincée, corde frottée (archet), corde au
-    marteau, membrane, corde couplée à une membrane, oscillateurs.
+    marteau, membrane, corde couplée à une membrane, oscillateurs, ressort
+    tendu.
   - 13 formes 3D paramétriques.
   - Des briques à ajouter en un clic : corde, corde raide, chaîne, membrane
     (structures intégrées mi-gen), oscillateur, masse, point fixe.
@@ -68,7 +69,13 @@ Edge, Firefox ou Safari. Tout tourne en local.
     remplace des centaines de masses par quelques dizaines de modes, stables
     à toutes les fréquences et bien plus légers dans Max ;
   - briques physiques : « Corde réelle » (matériau, longueur, diamètre,
-    tension) et « Barre (xylophone) ».
+    tension), « Barre (xylophone) » et « Ressort » ;
+  - **ressort tendu** (modèle prêt et brique) : une corde à flexion très
+    souple de 300 masses. Les aigus y voyagent plus vite que les graves, donc
+    chaque aller-retour donne un « piou » descendant, comme une réverbe à
+    ressort ou un ressort frappé. Réglages : longueur (écho plus espacé),
+    tension (plus « boing »), durée, amortissement des aigus, modulation de
+    tension.
 - **Légende des paramètres** (M, K, Z, Zo…) et rôle de chaque curseur.
   Une **marge de stabilité** prévient avant l'explosion. **Secours** : retour
   automatique aux derniers réglages stables.
@@ -100,6 +107,7 @@ que MIMS4Max ignore :
 
     ~pos @in1 -5.5 0 0                 # position d'une masse / entrée
     ~place @corde -12 0 0 12 0 0       # extrémités d'une corde, coins d'une membrane
+    ~helice @ressort 30 1.2            # corde dessinée en ressort : 30 spires, rayon 1.2
 
 La physique est exactement celle de mi-gen. La position d'un point est un
 déplacement, et on le dessine à la hauteur `~pos + déplacement`. Pour qu'une

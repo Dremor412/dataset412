@@ -111,6 +111,7 @@ function compiler(mdl, options = {}) {
         pl = [-lx / 2, y, 0, lx / 2, y + ly, 0]; rangee += Math.ceil(ly / 5) + 1;
       }
     }
+    const helice = corde && mc.helice ? repereHelice(pl, mc.helice) : null;
     const debut = N.noms.length;
     for (let i = 0; i < nx; i++) {
       for (let j = 0; j < ny; j++) {
@@ -118,6 +119,10 @@ function compiler(mdl, options = {}) {
         let g, fixe = false;
         if (corde) {
           g = [pl[0] + (pl[3] - pl[0]) * ti, pl[1] + (pl[4] - pl[1]) * ti, pl[2] + (pl[5] - pl[2]) * ti];
+          if (helice) {                               // ressort : spires autour de l'axe (visuel seulement)
+            const th = 2 * Math.PI * helice.spires * ti, c = helice.r * Math.cos(th), s = helice.r * Math.sin(th);
+            for (let k = 0; k < 3; k++) g[k] += c * helice.e1[k] + s * helice.e2[k];
+          }
           fixe = mc.genre !== "chain" && !(mc.genre === "bendString" && option === 1) && (i === 0 || i === nx - 1);
         } else {
           g = [pl[0] + (pl[3] - pl[0]) * ti, pl[1] + (pl[4] - pl[1]) * tj, pl[2] + (pl[5] - pl[2]) * ti];
@@ -149,7 +154,7 @@ function compiler(mdl, options = {}) {
       for (let i = 0; i < nx - 1; i++)
         for (let j = 0; j < ny; j++) liens.push({ code: 2, i1: id(i, j), i2: id(i + 1, j), args: [K, Z] });
     }
-    macros.set(mc.nom, { debut, nx, ny, corde, genre: mc.genre });
+    macros.set(mc.nom, { debut, nx, ny, corde, genre: mc.genre, place: pl.slice() });
   }
   // ---- geometrie automatique des masses sans position
   placementAutomatique(N, mdl, indice, macros);
@@ -328,6 +333,22 @@ function compiler(mdl, options = {}) {
     plancher: N.noms.map((nom, i) => i).filter(i => N.etat[i] === FIXE && /(^|_)sol$/.test(N.noms[i])),
     indices: [...indice],
   };
+}
+
+/* repere d'une helice autour de l'axe pl (x0 y0 z0 x1 y1 z1) : deux vecteurs
+ * unitaires perpendiculaires a l'axe, le second le plus vertical possible */
+function repereHelice(pl, [spires, r]) {
+  const ax = [pl[3] - pl[0], pl[4] - pl[1], pl[5] - pl[2]];
+  const n = Math.hypot(...ax) || 1;
+  const a = ax.map(v => v / n);
+  const vec = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const norme = v => { const l = Math.hypot(...v) || 1; return v.map(x => x / l); };
+  let e1 = vec(a, [0, 0, 1]);
+  if (Math.hypot(...e1) < 1e-6) e1 = [1, 0, 0];         // axe vertical
+  e1 = norme(e1);
+  const e2 = norme(vec(e1, a));
+  if (e2[2] < 0) for (let k = 0; k < 3; k++) { e2[k] = -e2[k]; e1[k] = -e1[k]; }
+  return { spires, r, e1, e2 };
 }
 
 /* Positions 3D pour les masses qui n'en ont pas (scripts MIMS4Max) :

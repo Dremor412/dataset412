@@ -91,6 +91,21 @@ Object.assign(BRIQUES, {
       };
     },
   },
+  ressort: {
+    titre: "Ressort", desc: "Ressort tendu (corde à flexion très souple, migen-plus) : chaque aller-retour donne un « piou » descendant. " +
+      "Frappe-le près d'un bout et écoute près de l'autre.",
+    champs: { L: ["longueur (m)", 0.3, 0.15, 1.5], T: ["tension", 1, 0, 5], t60: ["durée du son (s)", 2, 0.1, 20],
+              spires: ["spires (dessin)", 30, 5, 80] },
+    lignes(mdl, v, vue) {
+      const nom = nomLibre(mdl, "ressort"), y = rangeeLibre(vue);
+      return {
+        params: [`@${nom}_L param ${v.L}`, `@${nom}_T param ${v.T}`, `@${nom}_t60 param ${v.t60}`,
+                 `@${nom}_aigus param 0.0003`, `@${nom}_tmod param 0`],
+        corps: [`@${nom} bendString 300 1. [0.01*${nom}_T] [0.03*pow(0.3/${nom}_L,2)] ${nom}_aigus [13.82/(${nom}_t60*44100)] ${nom}_tmod 0 0. 0.`],
+        geo: [`~place @${nom} -14 ${f2(y)} 4 14 ${f2(y)} 4`, `~helice @${nom} ${v.spires | 0} 1.2`],
+      };
+    },
+  },
   plaque: {
     titre: "Plaque / gong", desc: "Plaque avec épaisseur (migen-plus). Avec de la modulation de tension, la note glisse en s'éteignant (gong).",
     champs: { nx: ["masses en x", 16, 5, 60], ny: ["masses en y", 16, 5, 60], bords: ["bords", "centre (gong suspendu)", ["libres", "fixes", "centre (gong suspendu)"]],
